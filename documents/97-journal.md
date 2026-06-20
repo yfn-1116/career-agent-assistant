@@ -2,6 +2,28 @@
 
 ## 2026-06-20
 
+### DEMO-001 CLI Demo
+
+- Executor: Claude Code + DeepSeek
+- Type: demo / cli
+- Summary:
+  - 创建 CLI demo 入口 run_job_match_demo.py。
+  - 支持 --profile-dir / --job-file / --output-file / --top-k 参数。
+  - 输出 Markdown 报告到 outputs/demo/，包含 6 个章节。
+  - 添加 10 个 CLI smoke test。
+- Changed files:
+  - demo/cli/run_job_match_demo.py
+  - tests/demo/test_cli_demo_smoke.py
+  - documents/97-journal.md
+  - documents/99-project-planning.md
+- Validation:
+  - CLI demo 只调用 workflow，不重写核心逻辑。
+  - 未引入外部依赖。
+  - 未实现 Streamlit 或 FastAPI。
+  - 150 tests passed.
+- Next:
+  - DOC-RUNBOOK-001 运行手册
+
 ### WORKFLOW-001 JobMatchWorkflow 集成
 
 - Executor: Claude Code + DeepSeek

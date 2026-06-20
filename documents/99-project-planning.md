@@ -40,7 +40,7 @@ Phase 1：文档补强与架构边界定义
 | AGENT | AGENT-004 | 实现 MatchAnalysisAgent | Claude Code + DeepSeek | DONE | 规则型，10 tests |
 | AGENT | AGENT-005 | 实现 BuildAgent | Claude Code + DeepSeek | DONE | 模板型，不编造，9 tests |
 | WORKFLOW | WORKFLOW-001 | Agent workflow 集成 | Claude Code + DeepSeek | DONE | 串联 4 Agent，11 tests，140 total |
-| DEMO | DEMO-001 | CLI demo | Claude Code + DeepSeek 或 Codex | TODO | 只调用已有 workflow |
+| DEMO | DEMO-001 | CLI demo | Claude Code + DeepSeek | DONE | CLI + Markdown 报告，10 smoke tests |
 | DEMO | DEMO-002 | Streamlit demo | Claude Code + DeepSeek | TODO | 只做展示层 |
 | DEPLOY | DEPLOY-001 | 学校服务器部署文档 | Claude Code + DeepSeek | TODO | 不写部署脚本 |
 
