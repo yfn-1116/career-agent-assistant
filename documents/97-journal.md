@@ -2,6 +2,25 @@
 
 ## 2026-06-20
 
+### AGENT-002 JDParserAgent
+
+- Executor: Claude Code + DeepSeek
+- Type: implementation / agent-jd-parser
+- Summary:
+  - 实现规则型 JDParserAgent。
+  - 从 JD 文本提取 job_title、job_direction、hard/bonus/soft skills、keywords。
+  - 不调用 LLM，纯关键词匹配。
+- Changed files:
+  - src/career_agent/agents/jd_parser.py
+  - tests/agents/test_jd_parser.py
+  - documents/97-journal.md
+  - documents/99-project-planning.md
+- Validation:
+  - 未修改 state.py 和 RAG 模块。
+  - 98 tests passed (61 RAG + 19 state + 18 jd_parser).
+- Next:
+  - AGENT-003 RAGRetrieveAgent
+
 ### AGENT-001 AgentTaskState 设计
 
 - Executor: Claude Code + DeepSeek
