@@ -2,6 +2,30 @@
 
 ## 2026-06-20
 
+### RAG-004 VectorStore 接口与 MemoryVectorStore
+
+- Executor: Codex
+- Type: implementation / rag-vectorstore
+- Summary:
+  - 定义 VectorStore 抽象接口。
+  - 实现 MemoryVectorStore。
+  - 支持添加 DocumentChunk、关键词检索、top_k、clear、count。
+  - 返回 RetrievedEvidence 列表。
+- Changed files:
+  - src/career_agent/rag/vectorstores/__init__.py
+  - src/career_agent/rag/vectorstores/base.py
+  - src/career_agent/rag/vectorstores/memory_store.py
+  - tests/rag/test_vectorstore_interface.py
+  - documents/97-journal.md
+  - documents/99-project-planning.md
+- Validation:
+  - 未修改 schema、loader、chunking。
+  - 未实现 retriever/pipeline。
+  - 未引入 Chroma / FAISS / LangChain / LangGraph。
+  - 测试不依赖外部模型或网络。
+- Next:
+  - RAG-005 RAGPipeline 集成建议交给 Codex。
+
 ### RAG-003 文本清洗与 Chunk 切分
 
 - Executor: Claude Code + DeepSeek
