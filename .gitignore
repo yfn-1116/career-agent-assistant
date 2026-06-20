@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Environment
+.env
+.venv/
+venv/
+
+# Data and generated outputs
+data/private/
+outputs/*
+!outputs/demo/
+!outputs/demo/.gitkeep
+
+# IDE and OS
+.DS_Store
+.idea/
+.vscode/
