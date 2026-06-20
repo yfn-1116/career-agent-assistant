@@ -58,6 +58,12 @@ def build_parser() -> argparse.ArgumentParser:
         choices=["deepseek", "qwen"],
         help="LLM provider（默认: deepseek，可选: qwen）",
     )
+    p.add_argument(
+        "--use-embedding",
+        action="store_true",
+        default=False,
+        help="启用真实语义检索（需设置 QWEN_API_KEY，使用 Qwen Embedding API）",
+    )
     return p
 
 
@@ -226,8 +232,22 @@ def main() -> None:
             except Exception as e:
                 print(f"⚠️  无法初始化 DeepSeek：{e}，回退到规则型")
 
+    rag_pipeline = None
+    if args.use_embedding:
+        from career_agent.rag.embeddings.embedding_store import EmbeddingVectorStore
+        from career_agent.rag.embeddings.qwen_embedding import QwenEmbeddingProvider
+        from career_agent.rag.pipeline import RAGPipeline
+        try:
+            emb_provider = QwenEmbeddingProvider()
+            emb_store = EmbeddingVectorStore(emb_provider)
+            rag_pipeline = RAGPipeline(vectorstore=emb_store)
+            print(f"🔍 已启用 Qwen Embedding 语义检索（model: {emb_provider.model}）")
+        except Exception as e:
+            print(f"⚠️  无法初始化 Embedding：{e}，回退到关键词检索")
+
     wf = JobMatchWorkflow(
         profile_dir=profile_dir,
+        rag_pipeline=rag_pipeline,
         jd_parser=jd_parser,
         match_analysis_agent=match_analysis_agent,
         build_agent=build_agent,
