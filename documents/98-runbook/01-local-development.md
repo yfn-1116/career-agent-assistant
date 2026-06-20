@@ -18,7 +18,15 @@ cd career-agent-assistant
 pip install pytest
 ```
 
-本项目**不依赖外部大模型**，第一阶段所有 Agent 使用规则和模板生成。无需配置 API Key。
+本项目**默认不依赖外部大模型**，第一阶段所有 Agent 使用规则和模板生成。无需配置 API Key。
+
+### 可选：启用 LLM 增强
+
+```bash
+export DEEPSEEK_API_KEY=你的key
+```
+
+BuildAgent 支持可选 LLM 生成（`use_llm=True`），失败时自动回退规则型。详见 `documents/03-technical-decisions/07-model-provider-abstraction.md`。
 
 ## 3. 运行全部测试
 

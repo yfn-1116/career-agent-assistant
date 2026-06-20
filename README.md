@@ -60,6 +60,10 @@ cat outputs/demo/job_match_result.md
 # 可选：Streamlit 可视化展示
 pip install streamlit
 PYTHONPATH=src streamlit run demo/streamlit/app.py
+
+# 可选：启用 LLM 增强（需要 DeepSeek API Key）
+export DEEPSEEK_API_KEY=你的key
+# 代码中 BuildAgent(use_llm=True) 即可切换
 ```
 
 ## 项目结构
@@ -68,7 +72,8 @@ PYTHONPATH=src streamlit run demo/streamlit/app.py
 src/career_agent/
 ├── rag/           # RAG pipeline（loader, chunker, vectorstore, retriever, pipeline）
 ├── agents/        # AgentTaskState + JDParser/RAGRetrieve/MatchAnalysis/Build
-└── workflows/     # JobMatchWorkflow
+├── workflows/     # JobMatchWorkflow
+└── models/        # ModelProvider / MockProvider / DeepSeekProvider
 
 demo/
 ├── cli/           # CLI demo 入口
