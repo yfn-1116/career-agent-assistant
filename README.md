@@ -52,11 +52,15 @@ cd career-agent-assistant
 # 运行全部测试
 PYTHONPATH=src pytest tests/rag tests/agents tests/workflows tests/demo -v
 
-# 运行 CLI demo
+# 运行 CLI demo（默认稳定展示方式）
 PYTHONPATH=src python demo/cli/run_job_match_demo.py
 
 # 查看输出
 cat outputs/demo/job_match_result.md
+
+# 可选：Streamlit 可视化展示
+pip install streamlit
+PYTHONPATH=src streamlit run demo/streamlit/app.py
 ```
 
 ### 待完成

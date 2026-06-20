@@ -14,15 +14,23 @@
 
 ## 当前阶段
 
-Phase 1：**CLI Demo 已完成**。运行方式：
+- **CLI Demo**：默认稳定展示方式
+- **Streamlit Demo**：可选可视化展示方式
+
+### CLI Demo
 
 ```bash
 PYTHONPATH=src python demo/cli/run_job_match_demo.py
 ```
 
-输出 `outputs/demo/job_match_result.md`。
+### Streamlit Demo
 
-后续将开发 Streamlit demo（Phase 2），届时只调用已有 workflow，不在页面内写核心逻辑。
+```bash
+pip install streamlit
+PYTHONPATH=src streamlit run demo/streamlit/app.py
+```
+
+两种 demo 都只调用 JobMatchWorkflow，不重写核心业务逻辑。
 
 ## 重要说明
 

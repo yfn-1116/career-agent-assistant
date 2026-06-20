@@ -2,6 +2,30 @@
 
 ## 2026-06-20
 
+### DEMO-002 Streamlit Demo
+
+- Executor: Claude Code + DeepSeek
+- Type: demo / streamlit
+- Summary:
+  - 创建 Streamlit 可视化 demo。
+  - 支持选择示例 JD 或粘贴 JD 文本，设置 top_k。
+  - 调用 JobMatchWorkflow 展示完整分析结果。
+  - 添加 15 个 Streamlit 静态测试。
+- Changed files:
+  - demo/streamlit/app.py
+  - tests/demo/test_streamlit_app_static.py
+  - .gitignore
+  - documents/06-demo/
+  - documents/98-runbook/
+  - README.md
+- Validation:
+  - Streamlit demo 只调用 workflow，不重写核心逻辑。
+  - 未引入 FastAPI / LangGraph / LangChain。
+  - 未调用外部模型或网络。
+  - 165 tests passed.
+- Next:
+  - DEPLOY-001 学校服务器部署文档
+
 ### README 当前状态更新
 
 - Executor: Claude Code + DeepSeek

@@ -15,6 +15,7 @@ data/private/
 outputs/*
 !outputs/demo/
 !outputs/demo/.gitkeep
+outputs/demo/*.md
 
 # IDE and OS
 .DS_Store
