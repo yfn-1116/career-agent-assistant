@@ -2,6 +2,25 @@
 
 ## 2026-06-20
 
+### EVAL-003 评估文档补充
+
+- Executor: Claude Code + DeepSeek
+- Type: documentation / evaluation
+- Summary:
+  - 补充评估模块说明文档。
+  - 更新 RAG/Agent 输出/Demo case 评估文档。
+  - 新增评估 runner 使用说明。
+  - README 添加评估命令。
+- Changed files:
+  - README.md
+  - documents/05-evaluation/
+  - documents/97-journal.md
+- Validation:
+  - 仅补充文档，未修改核心代码。
+  - 216 tests passed.
+- Next:
+  - 可考虑 GitHub Repo Agent 或 Embedding 检索增强。
+
 ### EVAL-002 多 JD 评估 Runner
 
 - Executor: Claude Code + DeepSeek

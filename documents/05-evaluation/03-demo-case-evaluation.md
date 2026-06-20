@@ -1,33 +1,32 @@
 # Demo Case 评估
 
-## 评估目标
+## 目标
 
-检查 demo 是否能在本地和学校服务器复现，并稳定展示核心链路。
+确保 4 个示例 JD 的运行结果稳定、可对比、可复现。
 
-## 输入样例
+## 当前 Demo JD
 
-- 固定用户资料 Markdown。
-- 固定 GitHub 仓库摘要 Markdown。
-- 固定示例 JD Markdown。
+| JD 文件 | 方向 | 预期评估特点 |
+|---|---|---|
+| agent_intern_jd.md | agent | evidence 丰富，得分较高 |
+| rag_engineer_intern_jd.md | rag | RAG 关键词覆盖好 |
+| ai_application_intern_jd.md | ai_application | 香港岗位，部分技能覆盖 |
+| backend_ai_intern_jd.md | backend | 后端技能覆盖 |
 
-## 评估指标
+## 运行方式
 
-- CLI demo 是否能完整运行。
-- 是否生成 Markdown 输出。
-- 输出是否包含 JD 解析、检索证据、匹配分析和最终建议。
-- 学校服务器是否能拉取 GitHub 仓库并复现。
-- 模型不可用时是否有兜底展示方案。
+```bash
+PYTHONPATH=src python demo/evaluation/run_evaluation.py
+cat outputs/demo/evaluation_report.md
+```
 
-## 人工检查方式
+## 稳定性要求
 
-按照 runbook 从零执行 demo，记录每一步命令、输出文件和异常情况。
+- 每次运行相同 JD，规则型 Agent 输出一致
+- score 应稳定（因规则型无随机性）
+- 后续接入 LLM 后，score 可能有波动，需记录
 
-## 后续自动化方向
+## 后续增强
 
-- 增加 smoke test。
-- 增加 demo 输出快照。
-- 增加服务器环境自检。
-
-## 后续维护规则
-
-每次 demo 流程变化都需要更新本文档和 `documents/06-demo/`。
+- 增加更多 JD 类型
+- 对比规则型 vs LLM 型的 score 差异

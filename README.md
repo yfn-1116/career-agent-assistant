@@ -61,6 +61,10 @@ cat outputs/demo/job_match_result.md
 pip install streamlit
 PYTHONPATH=src streamlit run demo/streamlit/app.py
 
+# 运行评估 runner（检查输出质量）
+PYTHONPATH=src python demo/evaluation/run_evaluation.py
+cat outputs/demo/evaluation_report.md
+
 # 可选：启用 LLM 增强（需要 DeepSeek API Key）
 export DEEPSEEK_API_KEY=你的key
 # 代码中 BuildAgent(use_llm=True) 即可切换

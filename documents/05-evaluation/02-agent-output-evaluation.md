@@ -2,32 +2,29 @@
 
 ## 评估目标
 
-检查 JD 解析、匹配分析和最终生成内容是否符合岗位要求，并且不编造用户经历。
+检查 Agent 生成的输出是否完整、是否基于证据、是否可安全用于求职场景。
 
-## 输入样例
+## 当前检查项
 
-- 示例 JD。
-- `RetrievedEvidence` 列表。
-- 用户请求，例如“帮我生成一段适合这个岗位的项目描述”。
+| 检查 | 规则 | 说明 |
+|---|---|---|
+| workflow_status | status=completed，无 error_message | workflow 是否成功运行 |
+| generated_output_non_empty | summary / resume_bullets / communication_message 均非空 | 输出是否完整 |
+| evidence_refs | evidence_refs 可关联到 retrieved_evidence | 输出是否有据可查 |
 
-## 评估指标
+## 重要约束
 
-- JD 关键词解析是否准确。
-- 匹配分析是否覆盖强匹配、弱匹配和缺口。
-- 生成内容是否引用真实资料。
-- 输出是否适合简历或沟通场景。
-- 是否出现无证据的夸大表达。
+- BuildAgent 明确要求**不得编造经历**
+- 当 evidence 为空时，应输出保守提示而非编造项目
+- 后续接入 LLM 时，prompt 必须包含防编造约束
 
-## 人工检查方式
+## 人工检查要点
 
-人工对照 `retrieved_evidence` 和最终输出，标记每个关键结论是否有依据。无法追溯的内容必须删除或改为建议。
+- 输出中的项目名称是否来自用户资料
+- 技能描述是否与 evidence 一致
+- 沟通话术是否自然、得体
 
-## 后续自动化方向
+## 后续增强方向
 
-- 增加事实一致性检查。
-- 增加输出结构检查。
-- 增加 ReviewAgent 复核节点。
-
-## 后续维护规则
-
-Agent prompt 或输出格式变化后，必须重新检查固定 demo case。
+- LLM-as-judge：用 LLM 评估 LLM 输出的真实性
+- 人工评分：对 resume_bullets 做 1-5 分可用性评分
