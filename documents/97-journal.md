@@ -2,6 +2,26 @@
 
 ## 2026-06-20
 
+### MODEL-002 BuildAgent 可选模型生成
+
+- Executor: Claude Code + DeepSeek
+- Type: implementation / agent-model-integration
+- Summary:
+  - BuildAgent 支持可选 ModelProvider，默认规则型。
+  - use_llm=True 时 communication_message 使用 LLM 生成。
+  - LLM 失败时 fallback 到规则型。
+  - 8 个新测试覆盖 LLM 路径、fallback、不编造约束。
+- Changed files:
+  - src/career_agent/agents/build_agent.py
+  - tests/agents/test_build_agent.py
+  - documents/97-journal.md
+- Validation:
+  - 190 tests passed（新增 8 个 build_agent LLM 测试）。
+  - 默认 use_llm=False，行为与 Phase 1 完全一致。
+  - 所有测试使用 MockProvider，不依赖真实 API。
+- Next:
+  - Phase D: Demo 层 LLM 说明
+
 ### MODEL-001 Phase B：模型 Provider 实现
 
 - Executor: Claude Code + DeepSeek
