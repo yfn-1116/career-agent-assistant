@@ -2,6 +2,26 @@
 
 ## 2026-06-20
 
+### REVIEW-001 项目整体审查
+
+- Executor: Claude Code + DeepSeek
+- Type: review / documentation
+- Summary:
+  - 完成项目整体审查：完成度、亮点、不足、建议。
+  - 识别 5 个风险点并给出修复优先级。
+  - 完成 GitHub 展示就绪检查清单。
+- Changed files:
+  - documents/07-review/（4 文件）
+  - documents/97-journal.md
+  - documents/99-project-planning.md
+- Key findings:
+  - 项目适合期末实训展示和写进简历。
+  - 165 tests 全部通过，零外部依赖。
+  - 主要不足：关键词检索精度、规则型 Agent 质量、缺少 pyproject.toml 和 CI。
+  - 最值得增强：接入 LLM API + Embedding 检索。
+- Next:
+  - PRESENTATION-001 展示材料整理
+
 ### DEPLOY-001 学校服务器部署文档
 
 - Executor: Claude Code + DeepSeek
