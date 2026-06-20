@@ -28,7 +28,7 @@ Phase 1：文档补强与架构边界定义
 | DOC | DOC-REFERENCE-001 | 开源项目参考文档补全 | Claude Code + DeepSeek | DONE | 8 个项目深度分析，横向对比表，技术路线确认 |
 | ARCH | ARCH-003 | 代码目录结构决策 | Codex | DONE | 采用 src/career_agent；ARCH-003 不创建 pyproject；demo 使用 demo/cli 与 demo/streamlit |
 | DOC | DOC-RUNBOOK-001 | 补充 runbook 文档 | Claude Code + DeepSeek | TODO | 本地、GitHub、学校服务器流程 |
-| SAMPLE | SAMPLE-001 | 示例用户资料与岗位 JD | Claude Code + DeepSeek | NEXT | 只写 data/samples/ 示例资料 |
+| SAMPLE | SAMPLE-001 | 示例用户资料与岗位 JD | Claude Code + DeepSeek | DONE | 4 份脱敏样例数据，覆盖 Agent 实习场景 |
 | RAG | RAG-001 | 设计 RAG 核心数据结构 | Codex | DONE | 已实现 ProfileItem / ProfileDocument / DocumentChunk / RetrievedEvidence |
 | RAG | RAG-002 | 实现 MarkdownProfileLoader | Claude Code + DeepSeek | NEXT | 依赖 RAG-001 |
 | RAG | RAG-003 | 实现文本清洗与 chunk 切分 | Claude Code + DeepSeek | NEXT | 依赖 RAG-001 |
@@ -50,7 +50,7 @@ Phase 1：文档补强与架构边界定义
 2. ~~DOC-REFERENCE-001 补充参考项目文档。~~ ✅
 3. ~~ARCH-003 代码目录结构决策。~~ ✅
 4. ~~RAG-001 RAG schema 设计。~~ ✅
-5. SAMPLE-001 示例用户资料与岗位 JD。← 下一步，Claude Code + DeepSeek
+5. ~~SAMPLE-001 示例用户资料与岗位 JD。~~ ✅
 6. RAG-002 Markdown loader。← 下一步，Claude Code + DeepSeek
 7. RAG-003 chunking。← 下一步，Claude Code + DeepSeek
 8. RAG-004 VectorStore interface。← 下一步，Codex

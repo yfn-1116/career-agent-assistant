@@ -20,7 +20,16 @@
 
 ## 当前状态
 
-当前未创建样例数据。`SAMPLE-001` 负责后续补充 `data/samples/`。
+已创建 4 份示例数据（SAMPLE-001 完成）：
+
+| 文件 | 内容 | 用途 |
+|---|---|---|
+| `data/samples/profile.md` | 个人能力资料（技能/项目/实习/教育） | RAG 检索源 |
+| `data/samples/projects.md` | 3 个项目经历详情 | 精确检索细节 |
+| `data/samples/github_summary.md` | 5 个 GitHub 仓库摘要 | 项目经历匹配 |
+| `data/samples/jd_agent_intern.md` | 3 个 AI 实习岗位 JD | JD 解析和匹配验证 |
+
+所有数据均为脱敏虚构内容，不包含真实手机号、邮箱、学号、API Key。
 
 ## 后续维护规则
 

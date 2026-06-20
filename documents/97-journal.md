@@ -2,6 +2,34 @@
 
 ## 2026-06-20
 
+### SAMPLE-001 示例用户资料与岗位 JD
+
+- Executor: Claude Code + DeepSeek
+- Type: data / sample
+- Summary:
+  - 创建 4 份脱敏示例数据文件。
+  - 覆盖 AI Agent 实习岗位匹配场景。
+  - 每份资料可支撑 RAG 检索和匹配分析验证。
+- Changed files:
+  - data/samples/profile.md（个人能力资料）
+  - data/samples/projects.md（3 个项目经历详情）
+  - data/samples/github_summary.md（5 个 GitHub 仓库摘要）
+  - data/samples/jd_agent_intern.md（3 个 AI 实习岗位 JD）
+  - documents/06-demo/02-demo-data.md（状态更新）
+  - documents/97-journal.md（本记录）
+  - documents/99-project-planning.md（状态更新）
+- Validation:
+  - 所有数据为脱敏虚构内容，不包含真实手机号/邮箱/学号/API Key。
+  - 未修改 src/、tests/、outputs/。
+  - 未写业务代码。
+  - profile.md 覆盖技能/项目/实习/教育四大分区。
+  - projects.md 覆盖 3 个项目的技术架构和实现细节。
+  - jd_agent_intern.md 覆盖 3 个不同方向的 AI 实习 JD。
+- Next:
+  - RAG-002 Markdown Loader 可继续（依赖 RAG-001 schema）。
+  - RAG-003 Text Chunking 可继续。
+  - SAMPLE-001 创建的样例数据可直接用于 RAG-002 和 RAG-003 的测试。
+
 ### RAG-001 RAG 核心数据结构设计
 
 - Executor: Codex
