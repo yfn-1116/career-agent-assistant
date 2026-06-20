@@ -2,6 +2,24 @@
 
 ## 2026-06-20
 
+### MODEL-001 模型 Provider 抽象决策文档
+
+- Executor: Claude Code + DeepSeek
+- Type: documentation / decision
+- Summary:
+  - 新增模型 Provider 抽象技术决策文档。
+  - 新增 MODEL-001 任务卡。
+- Changed files:
+  - documents/03-technical-decisions/07-model-provider-abstraction.md
+  - docs/superpowers/tasks/MODEL-001-provider-abstraction.md
+  - documents/97-journal.md
+  - documents/99-project-planning.md
+- Validation:
+  - 仅文档，未改代码。
+  - 165 tests passed.
+- Next:
+  - Phase B: 实现 ModelProvider / MockProvider / DeepSeekProvider
+
 ### PRESENTATION-001 展示材料整理 + 文档一致性修复
 
 - Executor: Claude Code + DeepSeek
