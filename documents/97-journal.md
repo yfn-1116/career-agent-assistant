@@ -2,6 +2,25 @@
 
 ## 2026-06-20
 
+### DEMO-DOC-001 Demo 展示文档补强
+
+- Executor: Claude Code + DeepSeek
+- Type: documentation / demo
+- Summary:
+  - 补充 CLI demo 展示脚本（10 分钟完整讲解）。
+  - 补充样例数据说明与使用建议。
+  - 补充答辩与实习展示流程（12 分钟 + 兜底方案）。
+- Changed files:
+  - documents/06-demo/（4 文件）
+  - documents/97-journal.md
+  - documents/99-project-planning.md
+- Validation:
+  - 仅补充文档。
+  - 未修改业务代码。
+  - 未实现 Streamlit。
+- Next:
+  - README 当前状态更新
+
 ### DOC-RUNBOOK-001 运行手册补充
 
 - Executor: Claude Code + DeepSeek
