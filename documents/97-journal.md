@@ -2,6 +2,26 @@
 
 ## 2026-06-20
 
+### AGENT-005 BuildAgent
+
+- Executor: Claude Code + DeepSeek
+- Type: implementation / agent-build
+- Summary:
+  - 实现模板型 BuildAgent。
+  - resume_bullets 严格基于 evidence，不编造经历。
+  - evidence 为空时输出保守提示。
+  - 不调用 LLM。
+- Changed files:
+  - src/career_agent/agents/build_agent.py
+  - tests/agents/test_build_agent.py
+  - documents/97-journal.md
+  - documents/99-project-planning.md
+- Validation:
+  - 未修改 RAG 模块和已有 Agent。
+  - 129 tests passed.
+- Next:
+  - WORKFLOW-001 JobMatchWorkflow 集成
+
 ### AGENT-004 MatchAnalysisAgent
 
 - Executor: Claude Code + DeepSeek

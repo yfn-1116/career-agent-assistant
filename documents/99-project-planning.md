@@ -38,7 +38,7 @@ Phase 1：文档补强与架构边界定义
 | AGENT | AGENT-002 | 实现 JDParserAgent | Claude Code + DeepSeek | DONE | 规则型，18 tests |
 | AGENT | AGENT-003 | 实现 RAGRetrieveAgent | Claude Code + DeepSeek | DONE | 包装 RAGPipeline，12 tests |
 | AGENT | AGENT-004 | 实现 MatchAnalysisAgent | Claude Code + DeepSeek | DONE | 规则型，10 tests |
-| AGENT | AGENT-005 | 实现 BuildAgent | Claude Code + DeepSeek 或 Codex | TODO | 不得编造经历 |
+| AGENT | AGENT-005 | 实现 BuildAgent | Claude Code + DeepSeek | DONE | 模板型，不编造，9 tests |
 | WORKFLOW | WORKFLOW-001 | Agent workflow 集成 | Codex | TODO | 核心复杂任务 |
 | DEMO | DEMO-001 | CLI demo | Claude Code + DeepSeek 或 Codex | TODO | 只调用已有 workflow |
 | DEMO | DEMO-002 | Streamlit demo | Claude Code + DeepSeek | TODO | 只做展示层 |
