@@ -2,6 +2,26 @@
 
 ## 2026-06-20
 
+### DOC-RUNBOOK-001 运行手册补充
+
+- Executor: Claude Code + DeepSeek
+- Type: documentation / runbook
+- Summary:
+  - 补充本地开发运行手册。
+  - 补充 GitHub 同步手册。
+  - 补充学校服务器部署与 CLI demo 复现说明。
+  - 补充常见问题排查。
+- Changed files:
+  - documents/98-runbook/（5 文件）
+  - documents/97-journal.md
+  - documents/99-project-planning.md
+- Validation:
+  - 文档仅描述当前已存在的 CLI demo。
+  - 未假设 frontend/backend/server。
+  - 未修改业务代码。
+- Next:
+  - DEMO-DOC-001 演示文档补强
+
 ### DEMO-001 CLI Demo
 
 - Executor: Claude Code + DeepSeek

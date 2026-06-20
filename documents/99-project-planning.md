@@ -27,7 +27,7 @@ Phase 1：文档补强与架构边界定义
 | ARCH | ARCH-002 | 开源项目调研与参考架构沉淀 | Codex | DONE | 调研 LangGraph、Dify、RAGFlow、DeerFlow、OpenHands、Khoj、Flowise |
 | DOC | DOC-REFERENCE-001 | 开源项目参考文档补全 | Claude Code + DeepSeek | DONE | 8 个项目深度分析，横向对比表，技术路线确认 |
 | ARCH | ARCH-003 | 代码目录结构决策 | Codex | DONE | 采用 src/career_agent；ARCH-003 不创建 pyproject；demo 使用 demo/cli 与 demo/streamlit |
-| DOC | DOC-RUNBOOK-001 | 补充 runbook 文档 | Claude Code + DeepSeek | TODO | 本地、GitHub、学校服务器流程 |
+| DOC | DOC-RUNBOOK-001 | 补充 runbook 文档 | Claude Code + DeepSeek | DONE | 本地/GitHub/服务器/排查，5 文件 |
 | SAMPLE | SAMPLE-001 | 示例用户资料与岗位 JD | Claude Code + DeepSeek | DONE | 4 份脱敏样例数据，覆盖 Agent 实习场景 |
 | RAG | RAG-001 | 设计 RAG 核心数据结构 | Codex | DONE | 已实现 ProfileItem / ProfileDocument / DocumentChunk / RetrievedEvidence |
 | RAG | RAG-002 | 实现 MarkdownProfileLoader | Claude Code + DeepSeek | DONE | 单文件/目录加载，title提取，item_type推断，20 tests |
