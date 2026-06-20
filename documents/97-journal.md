@@ -2,6 +2,29 @@
 
 ## 2026-06-20
 
+### WORKFLOW-001 JobMatchWorkflow 集成
+
+- Executor: Claude Code + DeepSeek
+- Type: implementation / workflow
+- Summary:
+  - 实现 JobMatchWorkflow，串联全部 Agent。
+  - 链路：JD 文本 → JDParser → RAGRetrieve → MatchAnalysis → Build → AgentTaskState。
+  - 出错时 status=failed 并记录 error_message。
+  - 不引入 LangGraph，不调用外部模型。
+- Changed files:
+  - src/career_agent/workflows/__init__.py
+  - src/career_agent/workflows/job_match_workflow.py
+  - tests/workflows/test_job_match_workflow.py
+  - documents/97-journal.md
+  - documents/99-project-planning.md
+- Validation:
+  - 未修改 RAG 模块和所有 Agent。
+  - 完整链路 4 份 JD 均返回 status=completed。
+  - 140 tests passed (61 RAG + 68 agents + 11 workflow).
+- Next:
+  - DEMO-001 CLI demo
+  - DEMO-002 Streamlit demo
+
 ### AGENT-005 BuildAgent
 
 - Executor: Claude Code + DeepSeek
