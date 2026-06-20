@@ -2,6 +2,25 @@
 
 ## 2026-06-20
 
+### AGENT-004 MatchAnalysisAgent
+
+- Executor: Claude Code + DeepSeek
+- Type: implementation / agent-match-analysis
+- Summary:
+  - 实现规则型 MatchAnalysisAgent。
+  - 对比 ParsedJD 与 RetrievedEvidence，生成 strengths/weaknesses/recommended_projects/suggestions。
+  - 不调用 LLM。
+- Changed files:
+  - src/career_agent/agents/match_analysis_agent.py
+  - tests/agents/test_match_analysis_agent.py
+  - documents/97-journal.md
+  - documents/99-project-planning.md
+- Validation:
+  - 未修改 RAG 模块和已有 Agent。
+  - 120 tests passed.
+- Next:
+  - AGENT-005 BuildAgent
+
 ### AGENT-003 RAGRetrieveAgent
 
 - Executor: Claude Code + DeepSeek
