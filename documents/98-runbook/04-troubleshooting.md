@@ -132,3 +132,51 @@ python demo/cli/run_job_match_demo.py
 - 本项目需要 Python 3.10 或以上
 - 如果服务器默认 Python 版本过低，检查是否有 `python3.10` 或 `python3.11` 可用
 - 或使用 pyenv / conda 安装合适版本
+
+---
+
+## 10. Streamlit command not found
+
+**现象**：`streamlit: command not found`
+
+**解决**：
+
+```bash
+pip install streamlit
+```
+
+如果使用虚拟环境，确认已激活：
+
+```bash
+source .venv/bin/activate
+```
+
+---
+
+## 11. 端口 8501 无法访问
+
+**现象**：浏览器打不开 Streamlit 页面
+
+**排查**：
+
+1. 确认 Streamlit 已启动且无报错
+2. 先在本机测试：`http://localhost:8501`
+3. 如果本机可访问但外部不可，检查防火墙
+4. 使用 SSH 端口转发（见部署文档）
+
+---
+
+## 12. 服务器没有外网
+
+**解决**：
+
+- 在有网络的机器上 `git clone`，用 U 盘拷贝到服务器
+- 在有网络的机器上 `pip download pytest streamlit`，拷贝 `.whl` 文件到服务器安装
+
+---
+
+## 13. outputs/demo 产物是否要提交
+
+**不要提交**。`.gitignore` 已配置忽略 `outputs/demo/*.md`。
+
+这些是 demo 运行产物，每次运行可能不同，不应进入版本控制。

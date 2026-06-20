@@ -42,7 +42,7 @@ Phase 1：文档补强与架构边界定义
 | WORKFLOW | WORKFLOW-001 | Agent workflow 集成 | Claude Code + DeepSeek | DONE | 串联 4 Agent，11 tests，140 total |
 | DEMO | DEMO-001 | CLI demo | Claude Code + DeepSeek | DONE | CLI + Markdown 报告，10 smoke tests |
 | DEMO | DEMO-002 | Streamlit demo | Claude Code + DeepSeek | DONE | 轻量可视化，15 static tests |
-| DEPLOY | DEPLOY-001 | 学校服务器部署文档 | Claude Code + DeepSeek | TODO | 不写部署脚本 |
+| DEPLOY | DEPLOY-001 | 学校服务器部署文档 | Claude Code + DeepSeek | DONE | CLI+Streamlit 部署，checklist |
 
 ## 建议任务顺序
 

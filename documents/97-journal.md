@@ -2,6 +2,28 @@
 
 ## 2026-06-20
 
+### DEPLOY-001 学校服务器部署文档
+
+- Executor: Claude Code + DeepSeek
+- Type: documentation / deployment
+- Summary:
+  - 重写学校服务器部署文档，补充 Streamlit 运行方式和端口说明。
+  - 补充展示前检查清单。
+  - 补充分布式问题排查项。
+- Changed files:
+  - documents/98-runbook/03-school-server-deploy.md
+  - documents/98-runbook/04-troubleshooting.md
+  - documents/98-runbook/05-server-demo-checklist.md
+  - documents/97-journal.md
+  - documents/99-project-planning.md
+- Validation:
+  - 未创建 server/FastAPI/backend。
+  - 未新增部署脚本或密钥文件。
+  - 未引入外部依赖。
+- Next:
+  - 可开始准备答辩展示材料。
+  - 后续可接入真实模型 API。
+
 ### DEMO-002 Streamlit Demo
 
 - Executor: Claude Code + DeepSeek
