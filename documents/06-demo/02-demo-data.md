@@ -20,14 +20,26 @@
 
 ## 当前状态
 
-已创建 4 份示例数据（SAMPLE-001 完成）：
+已创建 9 份示例数据（SAMPLE-001 按新结构重建）：
+
+### 用户资料 (`data/samples/profile/`)
 
 | 文件 | 内容 | 用途 |
 |---|---|---|
-| `data/samples/profile.md` | 个人能力资料（技能/项目/实习/教育） | RAG 检索源 |
-| `data/samples/projects.md` | 3 个项目经历详情 | 精确检索细节 |
-| `data/samples/github_summary.md` | 5 个 GitHub 仓库摘要 | 项目经历匹配 |
-| `data/samples/jd_agent_intern.md` | 3 个 AI 实习岗位 JD | JD 解析和匹配验证 |
+| `resume.md` | 个人简历（背景/教育/技术栈/项目/实习/求职方向） | RAG 检索源 |
+| `projects.md` | 4 个项目经历详情（Agent/滴定/Smart Journey/CNN） | 精确检索 |
+| `github_repos.md` | 5 个 GitHub 仓库摘要 | 项目经历匹配 |
+| `skills.md` | 技能详情（Python/AI/Web/CV/硬件/工具链/领域） | 技能-岗位匹配 |
+| `internship.md` | 实习与实践经历详情 | 经历-岗位匹配 |
+
+### 岗位 JD (`data/samples/jobs/`)
+
+| 文件 | 内容 | 用途 |
+|---|---|---|
+| `agent_intern_jd.md` | AI Agent 开发实习生 JD | JD 解析和匹配 |
+| `rag_engineer_intern_jd.md` | RAG 工程师实习生 JD | 检索相关岗位匹配 |
+| `ai_application_intern_jd.md` | AI 应用开发实习生 JD | 香港岗位匹配 |
+| `backend_ai_intern_jd.md` | 后端开发实习生（AI 方向）JD | 后端岗位匹配 |
 
 所有数据均为脱敏虚构内容，不包含真实手机号、邮箱、学号、API Key。
 

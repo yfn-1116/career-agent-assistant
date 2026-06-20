@@ -2,33 +2,56 @@
 
 ## 2026-06-20
 
-### SAMPLE-001 示例用户资料与岗位 JD
+### SAMPLE-001 示例用户资料与岗位 JD（v2 按新结构重建）
 
 - Executor: Claude Code + DeepSeek
 - Type: data / sample
 - Summary:
-  - 创建 4 份脱敏示例数据文件。
-  - 覆盖 AI Agent 实习岗位匹配场景。
-  - 每份资料可支撑 RAG 检索和匹配分析验证。
+  - 按新目录结构重建 SAMPLE-001：`data/samples/profile/` + `data/samples/jobs/`。
+  - 创建 9 份脱敏示例数据文件。
+  - 用户资料贴合化学+计算机交叉背景，项目包含智能投递 Agent、自动滴定、Smart Journey、CNN 分类。
+  - 4 份 JD 覆盖 Agent 开发、RAG 工程师、AI 应用开发、后端 AI 方向。
 - Changed files:
-  - data/samples/profile.md（个人能力资料）
-  - data/samples/projects.md（3 个项目经历详情）
-  - data/samples/github_summary.md（5 个 GitHub 仓库摘要）
-  - data/samples/jd_agent_intern.md（3 个 AI 实习岗位 JD）
-  - documents/06-demo/02-demo-data.md（状态更新）
-  - documents/97-journal.md（本记录）
-  - documents/99-project-planning.md（状态更新）
+  - data/samples/profile/resume.md
+  - data/samples/profile/projects.md（4 个项目）
+  - data/samples/profile/github_repos.md（5 个仓库）
+  - data/samples/profile/skills.md（7 个技能分区）
+  - data/samples/profile/internship.md（2 段实习/实践）
+  - data/samples/jobs/agent_intern_jd.md
+  - data/samples/jobs/rag_engineer_intern_jd.md
+  - data/samples/jobs/ai_application_intern_jd.md
+  - data/samples/jobs/backend_ai_intern_jd.md
+  - documents/06-demo/02-demo-data.md
+  - documents/97-journal.md
+  - documents/99-project-planning.md
 - Validation:
-  - 所有数据为脱敏虚构内容，不包含真实手机号/邮箱/学号/API Key。
+  - 所有数据为脱敏虚构内容，无真实手机号/邮箱/学号/API Key。
   - 未修改 src/、tests/、outputs/。
-  - 未写业务代码。
-  - profile.md 覆盖技能/项目/实习/教育四大分区。
-  - projects.md 覆盖 3 个项目的技术架构和实现细节。
-  - jd_agent_intern.md 覆盖 3 个不同方向的 AI 实习 JD。
+  - 未写 Python 业务代码。
+  - projects.md 严格按照统一结构：类型/背景/技术栈/个人负责/核心亮点/可匹配岗位/简历依据。
+  - JD 覆盖 Agent、RAG、AI 应用、后端四个方向。
+- Key decisions:
+  - 用户设定为化学+计算机交叉背景，更贴合真实大学生情况（非纯 CS）。
+  - 项目经历不过度包装，不使用"精通""独立上线大型平台"等措辞。
+  - 智能投递 Agent 项目本身成为用户资料的一部分，体现"自用工具"的产品思维。
 - Next:
-  - RAG-002 Markdown Loader 可继续（依赖 RAG-001 schema）。
-  - RAG-003 Text Chunking 可继续。
-  - SAMPLE-001 创建的样例数据可直接用于 RAG-002 和 RAG-003 的测试。
+  - RAG-002 Markdown Loader 可基于新结构读取 `data/samples/profile/`。
+  - RAG-003 Text Chunking 可针对 resume/skills/projects 等不同内容类型设计 chunk 策略。
+
+### SAMPLE-001 示例用户资料与岗位 JD（v1 已废弃，被 v2 替代）
+
+- Executor: Claude Code + DeepSeek
+- Type: data / sample
+- Summary:
+  - 第一版创建了 4 份扁平样例数据文件。
+  - 已被 v2 按新目录结构替代。
+- Changed files (v1, superseded):
+  - data/samples/profile.md（已删除）
+  - data/samples/projects.md（已删除）
+  - data/samples/github_summary.md（已删除）
+  - data/samples/jd_agent_intern.md（已删除）
+
+
 
 ### RAG-001 RAG 核心数据结构设计
 
