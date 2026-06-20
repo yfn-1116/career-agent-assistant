@@ -1,37 +1,65 @@
-# RAG-001 设计 RAG 核心数据结构
+# RAG-001 RAG 核心数据结构设计
 
-## 用途
+## 任务编号
 
-本任务用于设计用户资料知识库的核心数据结构和元数据边界。
+RAG-001
 
-## 当前状态
+## 建议执行者
 
-状态：TODO。
+Codex
 
-## 建议 Executor
+## 任务目标
 
-Codex。
+设计 RAG 第一阶段核心 schema：`ProfileItem`、`ProfileDocument`、`DocumentChunk`、`RetrievedEvidence`，并明确字段语义和模块边界。本任务只写设计，不实现代码。
 
-## 允许修改
+## 允许修改文件
 
 - `documents/02-design/02-rag-module-design.md`
-- `documents/03-technical-decisions/03-vector-store-selection.md`
 - `documents/05-evaluation/01-rag-evaluation.md`
 - `documents/97-journal.md`
 - `documents/99-project-planning.md`
 
-## 禁止修改
+## 禁止修改文件
 
-- 业务代码实现。
-- Agent workflow。
-- Demo 页面。
-- 部署脚本。
+- `src/`
+- `tests/`
+- `data/`
+- `outputs/`
+- Agent workflow 文档以外的实现文件
+- 依赖配置文件
+
+## 输入
+
+- `documents/00-project-overview.md`
+- `documents/02-design/02-rag-module-design.md`
+- `documents/01-requirements/02-mvp-scope.md`
+
+## 输出
+
+- 明确四个 schema 的字段方向、字段含义、第一阶段必填字段和后续扩展字段。
+- 明确 loader、chunker、retriever、pipeline 对 schema 的使用边界。
+
+## 实现要求
+
+- 不写 Python 代码。
+- 不引入依赖。
+- 需要说明字段如何支持证据追溯和幻觉控制。
 
 ## 验收标准
 
-- 明确资料对象、chunk 元数据、引用字段和隐私边界。
-- 给出后续实现任务拆分建议。
+- `ProfileItem`、`ProfileDocument`、`DocumentChunk`、`RetrievedEvidence` 均有字段说明。
+- 每个 schema 能解释它服务于哪一步 RAG 流程。
+- 文档明确第一阶段不做多用户知识库和大规模 GitHub 源码分析。
 
-## 后续维护规则
+## 测试命令
 
-该任务属于核心架构任务，不能与 Demo 或部署任务合并执行。
+```bash
+git status --short
+find documents docs/superpowers/tasks -name '*.md' -type f -empty -print
+```
+
+## 提交信息建议
+
+```text
+docs: define rag core schema design
+```

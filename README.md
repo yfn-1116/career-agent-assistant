@@ -2,27 +2,55 @@
 
 ## 项目定位
 
-`career-agent-assistant` 是一个面向大学生实习求职场景的智能投递辅助 Agent。项目目标是帮助用户围绕岗位 JD、个人资料、项目经历和沟通场景，生成更可控、更可追溯的求职辅助输出。
+`career-agent-assistant` 是一个面向大学生实习求职场景的 RAG + 多 Agent 原型系统。它不是完整求职平台，也不是普通简历生成器，而是用来验证个人能力知识库、岗位理解、匹配分析和求职材料生成这一条核心链路。
 
 ## 核心模块
 
-- RAG 用户资料知识库：整理简历、项目经历、GitHub 仓库摘要、实习经历、技能材料等个人能力信息，后续用于检索增强生成。
-- 多 Agent 编排：围绕 JD 解析、资料检索、匹配分析、简历项目描述生成、沟通话术生成等任务设计可控工作流。
+- RAG 用户资料知识库：将本地 Markdown 简历、项目经历、GitHub 仓库摘要、课程项目、实习经历、技能材料等整理为可检索资料。
+- 多 Agent 编排：围绕 JD 解析、资料检索、匹配分析、简历项目描述生成、HR / mentor 沟通话术生成等任务拆分职责。
+- 文档先行工程流程：所有实现任务先进入 `documents/` 和 `docs/superpowers/`，再进入代码实现。
+- 本地开发到服务器展示：本地验证后推送 GitHub，再由学校服务器拉取并复现 demo。
 
 ## 第一阶段目标
 
-第一阶段坚持文档先行，先明确项目边界、模块拆分、协作规范、任务流程和验收方式。当前阶段不实现完整前后端，不实现 RAG，不实现 Agent workflow，不实现 Streamlit 页面。
+第一阶段跑通以下链路：
+
+```text
+本地用户资料 Markdown
+-> RAG 检索
+-> JD 解析
+-> 匹配分析
+-> 简历项目描述 / 沟通话术生成
+-> Markdown 或 Streamlit 展示
+```
+
+第一阶段优先采用 CLI + Markdown 输出，随后扩展 Streamlit 轻量展示。暂不做完整 frontend/backend/server 分离架构。
 
 ## 当前状态
 
-项目处于初始化阶段，尚未实现业务代码。当前仓库只包含中文项目文档体系、AI 协作规范和基础目录占位。
+项目已完成 Phase 0：中文文档体系、AI 协作规范和基础目录骨架初始化。当前进入 Phase 1：核心架构边界、模块设计文档与后续任务卡补强。仓库尚未实现业务代码。
 
 ## 后续开发流程
 
-后续开发遵循：文档设计 -> `docs/superpowers/specs/`、`docs/superpowers/plans/`、`docs/superpowers/tasks/` -> 代码实现 -> 测试验证 -> GitHub 同步 -> 学校服务器部署展示。
+后续开发遵循：
 
-## 维护规则
+```text
+文档设计
+-> specs / plans / tasks
+-> RAG schema
+-> RAG pipeline
+-> AgentTaskState
+-> 核心 Agent
+-> workflow 集成
+-> CLI demo
+-> Streamlit demo
+-> GitHub 同步
+-> 学校服务器部署展示
+```
 
-- 任何业务实现前必须先补充对应任务说明。
-- 不允许在没有授权的情况下修改全局架构、核心 schema、workflow 集成和技术选型。
-- 执行任务后必须更新 `documents/97-journal.md` 和 `documents/99-project-planning.md`。
+## 协作规则
+
+- Codex 负责核心架构、核心接口、RAG / Agent 集成和疑难修复。
+- Claude Code + DeepSeek 负责边界清晰的文档补全、样例数据、局部模块、测试和 demo。
+- ChatGPT + User 负责方案讨论、任务拆分和需求确认。
+- 所有执行任务必须先有 `docs/superpowers/plans/` 或 `docs/superpowers/tasks/` 下的任务说明。

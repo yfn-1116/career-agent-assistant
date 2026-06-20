@@ -1,35 +1,63 @@
-# DOC-REQ-001 补充需求文档
+# DOC-REQ-001 需求文档补强
 
-## 用途
+## 任务编号
 
-本任务用于补充用户场景、MVP 范围、非目标和验收标准。
+DOC-REQ-001
 
-## 当前状态
+## 建议执行者
 
-状态：TODO。
+Claude Code + DeepSeek
 
-## 建议 Executor
+## 任务目标
 
-Claude Code + DeepSeek。
+补充用户场景、MVP 范围、非目标和验收标准，使需求文档能指导后续 RAG、Agent 和 demo 任务。
 
-## 允许修改
+## 允许修改文件
 
 - `documents/01-requirements/`
 - `documents/97-journal.md`
 - `documents/99-project-planning.md`
 
-## 禁止修改
+## 禁止修改文件
 
-- `documents/02-design/`
 - `src/`
 - `tests/`
-- 技术选型文档
+- `data/`
+- `outputs/`
+- `documents/02-design/`
+- 依赖配置文件
+
+## 输入
+
+- 用户提供的项目背景。
+- `documents/00-project-overview.md`
+
+## 输出
+
+- 完整需求场景。
+- MVP 范围和非目标。
+- 可验证验收标准。
+
+## 实现要求
+
+- 只写中文 Markdown。
+- 不写实现方案和业务代码。
+- 明确第一阶段不是完整求职平台。
 
 ## 验收标准
 
-- 每个需求文档包含具体场景、边界和可验证标准。
-- 不写实现方案。
+- 至少覆盖岗位判断、项目经历改写、沟通话术、避免编造和学校服务器展示场景。
+- 明确自动投递、爬取岗位网站、完整前后端、多用户系统等非目标。
 
-## 后续维护规则
+## 测试命令
 
-完成后需要更新任务看板状态和项目日志。
+```bash
+git status --short
+find documents/01-requirements -name '*.md' -type f -empty -print
+```
+
+## 提交信息建议
+
+```text
+docs: expand first phase requirements
+```
