@@ -2,6 +2,25 @@
 
 ## 2026-06-20
 
+### EVAL-002 多 JD 评估 Runner
+
+- Executor: Claude Code + DeepSeek
+- Type: evaluation / demo
+- Summary:
+  - 新增评估 runner，对 4 个示例 JD 执行批量评估。
+  - 生成 Markdown 评估报告到 outputs/demo/。
+  - 8 个 runner smoke test 通过。
+- Changed files:
+  - demo/evaluation/run_evaluation.py
+  - tests/demo/test_evaluation_runner.py
+  - documents/97-journal.md
+- Validation:
+  - 评估 runner 不依赖外部模型。
+  - 未修改核心 RAG / Agent / Workflow 逻辑。
+  - 216 tests passed.
+- Next:
+  - EVAL-003 评估文档补充
+
 ### EVAL-001 评估数据结构与基础规则
 
 - Executor: Claude Code + DeepSeek
