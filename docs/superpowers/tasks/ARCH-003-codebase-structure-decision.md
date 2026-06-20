@@ -10,11 +10,21 @@ Codex
 
 ## 任务目标
 
-在开源项目调研基础上，最终确定本项目第一阶段代码目录结构、Python package 方式、demo 入口和配置边界。本任务只做决策，不创建代码目录。
+最终确定第一阶段代码目录结构、Python package 方式、demo 入口、provider / evaluation 边界和后续实现任务路径。本任务只做文档决策，不创建代码目录。
 
 ## 允许修改文件
 
+- `documents/02-design/01-overall-architecture.md`
+- `documents/02-design/02-rag-module-design.md`
+- `documents/02-design/03-multi-agent-orchestration.md`
+- `documents/02-design/04-agent-state-design.md`
+- `documents/02-design/05-data-flow-design.md`
 - `documents/02-design/07-reference-inspired-architecture.md`
+- `documents/03-technical-decisions/01-display-mode-selection.md`
+- `documents/03-technical-decisions/02-langgraph-selection.md`
+- `documents/03-technical-decisions/03-vector-store-selection.md`
+- `documents/03-technical-decisions/04-model-provider-selection.md`
+- `documents/03-technical-decisions/05-frontend-backend-decision.md`
 - `documents/03-technical-decisions/06-reference-architecture-selection.md`
 - `documents/99-project-planning.md`
 - `documents/97-journal.md`
@@ -26,10 +36,13 @@ Codex
 - `tests/`
 - `data/`
 - `outputs/`
-- frontend/backend/server/app/scripts 目录
+- `README.md`
+- `AGENTS.md`
+- `.gitignore`
+- `.env.example`
 - `pyproject.toml`
 - `requirements.txt`
-- 业务代码文件
+- frontend/backend/server/app/scripts 目录。
 
 ## 输入
 
@@ -39,25 +52,19 @@ Codex
 
 ## 输出
 
-- 第一阶段代码目录结构决策。
-- 是否采用 `src/career_agent/` package 的结论。
-- 是否引入 `pyproject.toml` 的结论。
-- demo 入口放置位置的结论。
-- 后续 IMPLEMENT 任务需要创建哪些目录的清单。
+- 第一阶段采用 `src/career_agent/` package 的结论。
+- RAG、Agent、Workflow、Models、Evaluation、Demo 的最终目录建议。
+- 第一阶段和第二阶段目录创建边界。
+- 更新后的实现任务卡。
 
 ## 实现要求
 
 - 不创建代码目录。
 - 不写业务代码。
 - 不引入依赖。
-- 必须说明允许创建哪些代码目录、禁止创建哪些目录。
-
-## 验收标准
-
-- 明确是否采用 `src/career_agent` package。
-- 明确是否创建 `app/streamlit_app.py`。
-- 明确是否引入 `pyproject.toml`。
-- 明确第一批实现任务的目录创建范围。
+- 明确允许创建哪些代码目录、禁止创建哪些目录。
+- 明确不创建 `app/streamlit_app.py`。
+- 明确 ARCH-003 不创建 `pyproject.toml`。
 
 ## 测试命令
 
@@ -65,10 +72,19 @@ Codex
 git status --short
 find documents docs/superpowers/tasks -name '*.md' -type f -empty -print
 find . -path './.git' -prune -o -type d \( -name frontend -o -name backend -o -name server -o -name app -o -name scripts \) -print
+find . -maxdepth 4 -type f \( -name '*.py' -o -name 'pyproject.toml' -o -name 'requirements.txt' \) -print
 ```
 
-## 提交信息建议
+## 验收标准
+
+- 明确采用 `src/career_agent` package。
+- 明确 demo 使用 `demo/cli/` 和 `demo/streamlit/`。
+- 明确第一阶段不引入 LangGraph、Chroma / FAISS、完整前后端。
+- 明确后续任务的允许文件和禁止文件。
+- 未修改禁改目录。
+
+## 建议 commit message
 
 ```text
-docs: decide first phase codebase structure
+docs: finalize codebase structure plan for first implementation phase
 ```

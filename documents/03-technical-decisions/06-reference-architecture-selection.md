@@ -301,3 +301,18 @@ Workflow 层：普通 Python workflow（固定顺序编排）
 **不采用**：Dify 的平台架构、RAGFlow 的复杂文档解析、Flowise 的低代码编辑器、DeerFlow 的 supervisor/sandbox、OpenHands 的代码执行能力、Khoj 的泛化功能、LangGraph 的框架依赖。
 
 **后续**：ARCH-003 将基于本决策，最终确定代码目录结构和第一批创建的文件。
+
+## 7. ARCH-003 最终目录决策
+
+ARCH-003 最终确认：
+
+- 第一阶段采用 `src/career_agent/` 作为 Python package。
+- 第一阶段保留 `models/` provider 抽象和 `evaluation/` 评估模块。
+- 第一阶段 demo 采用 `demo/cli/` 和 `demo/streamlit/`。
+- 第一阶段不创建 `app/streamlit_app.py`。
+- 第一阶段不创建 `frontend/`、`backend/`、`server/`。
+- ARCH-003 不引入 `pyproject.toml` 或 `requirements.txt`。
+- 第一阶段不引入 LangGraph；普通 Python workflow 先行。
+- 第一阶段不引入 Chroma / FAISS；先定义 `VectorStore` 接口和 Memory 实现。
+
+这些决策服务于一个目标：先把本地 Markdown 资料、RAG pipeline、四个核心 Agent、固定 workflow 和可复现 demo 跑通。

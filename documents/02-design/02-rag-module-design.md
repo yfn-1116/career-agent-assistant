@@ -85,3 +85,17 @@
 - RAG schema 由 `RAG-001` 任务负责。
 - loader、chunking、vector store、pipeline 必须分任务实现。
 - 不允许局部任务同时修改 RAG 和 Agent workflow。
+
+## ARCH-003 代码结构决策
+
+第一阶段 RAG 模块最终放在 `src/career_agent/rag/` 下：
+
+- `schemas.py`：定义 `ProfileItem`、`ProfileDocument`、`DocumentChunk`、`RetrievedEvidence`。
+- `loaders/markdown_loader.py`：只处理本地 Markdown。
+- `chunking/text_chunker.py`：文本清洗和 chunk 切分。
+- `vectorstores/base.py`：`VectorStore` 接口。
+- `vectorstores/memory_store.py`：第一阶段内存检索实现。
+- `retrievers/simple_retriever.py`：简单检索器。
+- `pipeline.py`：组合 loader、chunker、vectorstore、retriever。
+
+第一阶段不接 Chroma / FAISS，不做 OCR，不做完整 GitHub 源码分析。

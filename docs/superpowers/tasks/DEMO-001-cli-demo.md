@@ -14,20 +14,22 @@ Claude Code + DeepSeek 或 Codex
 
 ## 允许修改文件
 
-- `src/demo/cli_demo.py`
-- `tests/demo/test_cli_demo.py`
-- `outputs/demo/`
+- `demo/cli/run_job_match_demo.py`
+- `tests/workflows/test_demo_smoke.py`
 - `documents/06-demo/01-demo-script.md`
 - `documents/97-journal.md`
 - `documents/99-project-planning.md`
 
 ## 禁止修改文件
 
-- RAG 底层实现
-- Agent 核心逻辑
-- workflow 核心逻辑
-- Streamlit 页面
-- frontend/backend/server 目录
+- `src/career_agent/rag/`
+- `src/career_agent/agents/`
+- `src/career_agent/workflows/`
+- `demo/streamlit/`
+- `frontend/`
+- `backend/`
+- `server/`
+- `app/`
 
 ## 输入
 
@@ -37,30 +39,31 @@ Claude Code + DeepSeek 或 Codex
 
 ## 输出
 
-- Markdown demo 输出文件。
-- 终端摘要。
+- CLI 命令入口。
+- Markdown demo 输出。
+- smoke test。
 
 ## 实现要求
 
-- 只调用已有 workflow。
-- 不重新实现业务逻辑。
-- 路径可配置或使用固定样例路径。
+- 只调用 workflow。
+- 不重新实现 RAG、Agent 或匹配逻辑。
+- CLI demo 优先于 Streamlit。
+
+## 测试命令
+
+```bash
+pytest tests/workflows/test_demo_smoke.py -v
+git status --short
+```
 
 ## 验收标准
 
 - 本地命令能跑通。
 - 输出包含 JD 解析、检索证据、匹配分析和最终内容。
-- 模型不可用时有明确错误或兜底路径。
+- CLI demo 不依赖 Streamlit。
 
-## 测试命令
-
-```bash
-pytest tests/demo/test_cli_demo.py -v
-git status --short
-```
-
-## 提交信息建议
+## 建议 commit message
 
 ```text
-feat: add cli demo for first phase workflow
+feat: add cli demo for job match workflow
 ```

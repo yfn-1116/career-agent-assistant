@@ -10,45 +10,42 @@ Claude Code + DeepSeek
 
 ## 任务目标
 
-只实现文本清洗与 chunk 切分能力，为检索索引提供稳定 `DocumentChunk`。
+实现文本清洗与 chunk 切分，将 `ProfileDocument` 或 `ProfileItem` 转换为 `DocumentChunk`。
 
 ## 允许修改文件
 
-- `src/rag/text_chunker.py`
+- `src/career_agent/rag/chunking/__init__.py`
+- `src/career_agent/rag/chunking/text_chunker.py`
 - `tests/rag/test_text_chunker.py`
 - `documents/97-journal.md`
 - `documents/99-project-planning.md`
 
 ## 禁止修改文件
 
-- `src/rag/schemas.py`
-- `src/rag/vectorstore.py`
-- `src/agents/`
-- `src/workflows/`
+- `src/career_agent/rag/schemas.py`
+- `src/career_agent/rag/loaders/`
+- `src/career_agent/rag/vectorstores/`
+- `src/career_agent/agents/`
+- `src/career_agent/workflows/`
 - `data/`
 - `outputs/`
 
 ## 输入
 
-- `ProfileDocument` 或文本段落。
-- chunk size 和 overlap 配置。
+- RAG-001 schema。
+- RAG-002 loader 输出。
 
 ## 输出
 
-- `DocumentChunk` 列表。
-- chunk metadata。
+- TextChunker。
+- chunking 单元测试。
 
 ## 实现要求
 
 - 不调用模型。
 - 不写向量库。
-- 不做 RAG pipeline 集成。
-
-## 验收标准
-
-- chunk 长度受控。
-- 保留 document_id、item_id、source_path 等 metadata。
-- 空文本和短文本处理稳定。
+- 不做 pipeline 集成。
+- chunk 必须保留 source、item_id、document_id 等 metadata。
 
 ## 测试命令
 
@@ -57,7 +54,13 @@ pytest tests/rag/test_text_chunker.py -v
 git status --short
 ```
 
-## 提交信息建议
+## 验收标准
+
+- chunk 长度受控。
+- metadata 不丢失。
+- 空文本和短文本处理稳定。
+
+## 建议 commit message
 
 ```text
 feat: add rag text chunker

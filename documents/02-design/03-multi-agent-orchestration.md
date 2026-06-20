@@ -60,3 +60,15 @@
 - 每个 Agent 必须有独立任务卡。
 - Agent 之间只能通过明确状态字段传递信息。
 - workflow 集成必须由 Codex 负责或复核。
+
+## ARCH-003 代码结构决策
+
+第一阶段 Agent 模块最终放在 `src/career_agent/agents/` 下：
+
+- `state.py`：定义 `AgentTaskState`。
+- `jd_parser.py`：只解析 JD。
+- `rag_retrieve_agent.py`：只调用 RAG pipeline。
+- `match_analysis_agent.py`：只做匹配分析。
+- `build_agent.py`：只基于 evidence 和 match_analysis 生成 Markdown 输出。
+
+Agent 不直接写 demo 输出文件，不直接创建索引，不跨模块修改 RAG 实现。

@@ -26,7 +26,7 @@ Phase 1：文档补强与架构边界定义
 | DOC | DOC-CHALLENGE-001 | 补充挑战与评估文档 | Claude Code + DeepSeek | DONE | 已建立风险与评估框架 |
 | ARCH | ARCH-002 | 开源项目调研与参考架构沉淀 | Codex | DONE | 调研 LangGraph、Dify、RAGFlow、DeerFlow、OpenHands、Khoj、Flowise |
 | DOC | DOC-REFERENCE-001 | 开源项目参考文档补全 | Claude Code + DeepSeek | DONE | 8 个项目深度分析，横向对比表，技术路线确认 |
-| ARCH | ARCH-003 | 代码目录结构决策 | Codex | NEXT | 决定 src/career_agent、pyproject、demo 入口 |
+| ARCH | ARCH-003 | 代码目录结构决策 | Codex | DONE | 采用 src/career_agent；ARCH-003 不创建 pyproject；demo 使用 demo/cli 与 demo/streamlit |
 | DOC | DOC-RUNBOOK-001 | 补充 runbook 文档 | Claude Code + DeepSeek | TODO | 本地、GitHub、学校服务器流程 |
 | SAMPLE | SAMPLE-001 | 示例用户资料与岗位 JD | Claude Code + DeepSeek | NEXT | 只写 data/samples/ 示例资料 |
 | RAG | RAG-001 | 设计 RAG 核心数据结构 | Codex | NEXT | ProfileItem / ProfileDocument / DocumentChunk / RetrievedEvidence |
@@ -48,14 +48,14 @@ Phase 1：文档补强与架构边界定义
 
 1. ~~ARCH-002 开源项目调研与参考架构沉淀。~~ ✅
 2. ~~DOC-REFERENCE-001 补充参考项目文档。~~ ✅
-3. ARCH-003 代码目录结构决策。← 下一步
-4. SAMPLE-001 示例用户资料与岗位 JD。
-5. RAG-001 RAG schema 设计。
-6. AGENT-001 AgentTaskState 设计。
-7. RAG-002 Markdown loader。
-8. RAG-003 chunking。
-9. RAG-004 VectorStore interface。
-10. RAG-005 RAG pipeline。
+3. ~~ARCH-003 代码目录结构决策。~~ ✅
+4. RAG-001 RAG schema 设计。← 下一步，Codex
+5. SAMPLE-001 示例用户资料与岗位 JD。← 下一步，Claude Code + DeepSeek
+6. RAG-002 Markdown loader。Claude Code + DeepSeek
+7. RAG-003 chunking。Claude Code + DeepSeek
+8. RAG-004 VectorStore interface。Codex
+9. RAG-005 RAG pipeline。Codex
+10. AGENT-001 AgentTaskState 设计。Codex
 11. AGENT-002 JDParserAgent。
 12. AGENT-003 RAGRetrieveAgent。
 13. AGENT-004 MatchAnalysisAgent。
@@ -69,11 +69,13 @@ Phase 1：文档补强与架构边界定义
 
 ### Codex
 
-适合负责 ARCH-003、RAG-001、RAG-004、RAG-005、AGENT-001、WORKFLOW-001，以及核心接口或疑难修复。
+适合负责 RAG-001、RAG-004、RAG-005、AGENT-001、WORKFLOW-001，以及核心接口或疑难修复。
 
 ### Claude Code + DeepSeek
 
 适合负责 DOC-REFERENCE-001、DOC-RUNBOOK-001、SAMPLE-001、RAG-002、RAG-003、AGENT-002、AGENT-003、AGENT-004、AGENT-005、DEMO-001、DEMO-002、DEPLOY-001 等边界清晰任务。
+
+Claude Code + DeepSeek 可以承担工作量较大的实现任务，但必须严格基于任务卡边界执行，不得在一次任务中同时跨越 RAG、Agent、Workflow、Demo 多个大模块。
 
 ### ChatGPT + User
 

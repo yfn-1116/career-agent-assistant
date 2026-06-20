@@ -28,3 +28,15 @@
 
 - 任何 frontend/backend/server 目录新增都必须先通过新的技术决策和任务卡。
 - Streamlit 页面只能作为展示层，不写核心业务逻辑。
+
+## ARCH-003 决策补充
+
+第一阶段明确不创建：
+
+- `frontend/`
+- `backend/`
+- `server/`
+- `app/`
+- `scripts/`
+
+Streamlit demo 放在 `demo/streamlit/`，CLI demo 放在 `demo/cli/`。FastAPI 服务化、前端页面和 server 目录留到第二阶段。

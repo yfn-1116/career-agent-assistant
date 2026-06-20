@@ -73,3 +73,23 @@ LangGraph 的节点通常围绕共享状态读写。提前设计 `AgentTaskState
 
 - `AGENT-001` 负责把本文档转化为更具体的 schema 设计。
 - 修改核心字段前必须评估对 workflow、日志和评估文档的影响。
+
+## ARCH-003 代码结构决策
+
+`AgentTaskState` 后续放在 `src/career_agent/agents/state.py`。第一阶段先服务普通 Python workflow，字段设计保留 LangGraph 迁移可能性。
+
+第一阶段必须支持：
+
+- `task_id`
+- `user_request`
+- `job_description`
+- `parsed_jd`
+- `retrieved_evidence`
+- `match_analysis`
+- `generated_output`
+- `status`
+- `error_message`
+- `created_at`
+- `updated_at`
+
+后续 LangGraph 阶段再考虑 checkpoint、node trace、human feedback 等字段。

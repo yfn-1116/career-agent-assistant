@@ -2,6 +2,33 @@
 
 ## 2026-06-20
 
+### ARCH-003 代码目录结构决策与第一阶段工程骨架规划
+
+- Executor: Codex
+- Type: architecture / codebase planning
+- Summary:
+  - 基于 ARCH-002 开源项目调研结果，确定第一阶段代码目录结构建议。
+  - 决定采用 src/career_agent 作为 Python package。
+  - 决定第一阶段不做完整 frontend/backend/server。
+  - 决定第一阶段先使用普通 Python workflow，后续再接 LangGraph。
+  - 决定第一阶段先抽象 VectorStore interface，具体向量库后续替换。
+  - 决定 demo 层只调用 workflow，不重写业务逻辑。
+  - 补强 RAG、Agent、Workflow、Demo 后续实现任务卡。
+- Changed files:
+  - documents/02-design/
+  - documents/03-technical-decisions/
+  - docs/superpowers/tasks/
+  - documents/99-project-planning.md
+  - documents/97-journal.md
+- Validation:
+  - 本轮未实现业务代码。
+  - 本轮未修改 src/、tests/、data/、outputs/。
+  - 本轮未引入依赖。
+- Next:
+  - RAG-001 可交给 Codex。
+  - SAMPLE-001、RAG-002、RAG-003 可交给 Claude Code + DeepSeek。
+  - RAG-004、RAG-005、AGENT-001 建议交给 Codex。
+
 ### DOC-REFERENCE-001 开源项目参考文档补全
 
 - Executor: Claude Code + DeepSeek

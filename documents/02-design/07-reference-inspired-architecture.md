@@ -31,7 +31,176 @@
 - 采用 Flowise / Dify 的流程可视化启发，但不做低代码平台。
 - 采用 Dify / RAGFlow 的模型 provider 抽象思想。
 
-## 4. 后续代码目录建议
+## 4. ARCH-003 最终代码目录决策
+
+ARCH-003 最终确认：第一阶段采用 `src/career_agent/` 作为 Python package，但本轮不创建该目录。后续具体创建目录和文件必须进入 RAG、Agent、Workflow、Demo 等实现任务。
+
+最终建议结构如下：
+
+```text
+src/
+└── career_agent/
+    ├── __init__.py
+    ├── rag/
+    │   ├── __init__.py
+    │   ├── schemas.py
+    │   ├── loaders/
+    │   │   └── markdown_loader.py
+    │   ├── chunking/
+    │   │   └── text_chunker.py
+    │   ├── vectorstores/
+    │   │   ├── base.py
+    │   │   └── memory_store.py
+    │   ├── retrievers/
+    │   │   └── simple_retriever.py
+    │   └── pipeline.py
+    │
+    ├── agents/
+    │   ├── __init__.py
+    │   ├── state.py
+    │   ├── jd_parser.py
+    │   ├── rag_retrieve_agent.py
+    │   ├── match_analysis_agent.py
+    │   └── build_agent.py
+    │
+    ├── workflows/
+    │   ├── __init__.py
+    │   └── job_match_workflow.py
+    │
+    ├── models/
+    │   ├── __init__.py
+    │   ├── provider.py
+    │   └── mock_provider.py
+    │
+    ├── evaluation/
+    │   ├── __init__.py
+    │   ├── rag_eval.py
+    │   └── output_eval.py
+    │
+    └── utils/
+        ├── __init__.py
+        └── text.py
+
+tests/
+├── rag/
+├── agents/
+├── workflows/
+├── models/
+└── evaluation/
+
+data/
+└── samples/
+    ├── profile/
+    └── jobs/
+
+outputs/
+└── demo/
+
+demo/
+├── cli/
+└── streamlit/
+```
+
+## 5. 第一阶段创建边界
+
+第一阶段可以在后续实现任务中创建：
+
+- `src/career_agent/rag/`
+- `src/career_agent/agents/`
+- `src/career_agent/workflows/`
+- `src/career_agent/models/`
+- `src/career_agent/evaluation/`
+- `src/career_agent/utils/`
+- `tests/rag/`
+- `tests/agents/`
+- `tests/workflows/`
+- `tests/models/`
+- `tests/evaluation/`
+- `data/samples/profile/`
+- `data/samples/jobs/`
+- `demo/cli/`
+- `demo/streamlit/`
+
+第一阶段仍禁止创建：
+
+- `frontend/`
+- `backend/`
+- `server/`
+- `app/`
+- `scripts/`
+
+`pyproject.toml` 和 `requirements.txt` 暂不在 ARCH-003 中创建。是否引入由后续“工程配置任务”单独决定。
+
+## 6. 第二阶段再创建的目录
+
+第二阶段如果进入服务化或产品化，再考虑：
+
+- `frontend/`
+- `backend/`
+- `server/`
+- API 服务层
+- 账号系统
+- 任务历史数据库
+- 复杂部署脚本
+
+## 7. 关键结构决策
+
+### 是否使用 `src/career_agent` package
+
+结论：使用。
+
+原因：
+
+- 方便测试和导入。
+- 项目边界清楚。
+- 后续可以扩展为包。
+- 避免 `src/` 根目录杂乱。
+- 仓库名 `career-agent-assistant` 包含连字符，不适合作为 Python import 名称；`career_agent` 更稳定。
+
+### RAG 模块如何拆分
+
+RAG 拆成 schema、loader、chunking、vectorstore、retriever、pipeline 六层。这样可以先用 Markdown + MemoryVectorStore 验证链路，后续替换 Chroma / FAISS 时不影响 Agent。
+
+### Agent 模块如何拆分
+
+Agent 拆成 `state.py` 和四个核心 Agent 文件。每个 Agent 只读写 `AgentTaskState` 中自己的字段，避免上下文污染。
+
+### Workflow 模块如何拆分
+
+第一阶段只实现 `job_match_workflow.py`。不创建 `graph_workflow.py` 的实际文件，直到决定引入 LangGraph。
+
+### Models / Provider 是否第一阶段设计
+
+结论：第一阶段保留 `models/provider.py` 和 `models/mock_provider.py`。先用 MockProvider 或 RuleBasedProvider 支持测试和 demo，后续再接 DeepSeek / OpenAI / 本地模型。
+
+### Evaluation 是否第一阶段保留
+
+结论：保留。RAG 和输出生成的质量必须能被评估，否则 demo 只证明“能生成”，不能证明“可信”。
+
+### Demo 层放在哪里
+
+结论：采用仓库根目录下的 `demo/cli/` 和 `demo/streamlit/`。
+
+原因：
+
+- demo 是运行入口和展示层，不属于核心 package。
+- CLI demo 优先。
+- Streamlit demo 第二步。
+- Demo 只能调用 workflow，不允许重写 RAG / Agent 业务逻辑。
+
+### 是否创建 `app/streamlit_app.py`
+
+结论：不创建。`app/` 容易暗示独立应用层或 Web 服务入口，第一阶段使用 `demo/streamlit/app.py` 更符合“展示层”定位。
+
+### 是否现在引入 `pyproject.toml`
+
+结论：ARCH-003 不引入。后续如需 pytest、ruff、editable install，再由独立工程配置任务决定。
+
+### 是否现在引入 LangGraph
+
+结论：不引入。第一阶段先用普通 Python workflow，保留 `AgentTaskState` 兼容 LangGraph 的设计。
+
+## 8. 后续代码目录建议
 
 建议后续进入实现阶段时，采用 Python package 结构：
 

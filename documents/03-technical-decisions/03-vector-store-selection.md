@@ -36,3 +36,12 @@
 
 - `RAG-004` 由 Codex 负责，因为接口会影响后续 Chroma / FAISS / memory store 切换。
 - 不允许 loader 或 Agent 直接依赖具体向量库。
+
+## ARCH-003 决策补充
+
+第一阶段目录采用：
+
+- `src/career_agent/rag/vectorstores/base.py`
+- `src/career_agent/rag/vectorstores/memory_store.py`
+
+第一阶段只要求 `VectorStore` 接口和 `MemoryVectorStore` 或简单本地检索实现。Chroma / FAISS / Qdrant 等具体向量库放到后续替换任务。

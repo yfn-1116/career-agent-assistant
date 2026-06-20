@@ -64,3 +64,9 @@
 
 - 新增 Agent 必须说明在数据流中的位置。
 - 展示层不得绕过 workflow 直接调用底层 RAG。
+
+## ARCH-003 代码结构决策
+
+第一阶段数据流由 `src/career_agent/workflows/job_match_workflow.py` 串联。CLI 和 Streamlit demo 必须调用该 workflow，不允许在 demo 层重新实现 JD 解析、RAG 检索、匹配分析或输出生成。
+
+`demo/cli/` 负责命令行入口，`demo/streamlit/` 负责轻量页面展示。两者共享同一个 workflow 输出。

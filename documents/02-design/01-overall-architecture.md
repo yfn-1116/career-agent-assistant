@@ -55,3 +55,9 @@
 - 新模块必须先写任务卡。
 - 不允许在 demo 层重新实现 RAG 或 Agent 逻辑。
 - 集成任务由 Codex 负责，局部实现任务可交给 Claude Code + DeepSeek。
+
+## ARCH-003 代码结构决策
+
+第一阶段最终采用 `src/career_agent/` 作为 Python package。RAG、Agent、Workflow、Models、Evaluation、Utils 都放在该 package 下，测试按模块放在 `tests/` 下。
+
+第一阶段不创建 `frontend/`、`backend/`、`server/`、`app/`、`scripts/`，不创建完整前后端架构。CLI 和 Streamlit demo 放在仓库根目录的 `demo/cli/` 与 `demo/streamlit/`，并且只能调用 workflow。

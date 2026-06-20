@@ -31,3 +31,12 @@
 
 - provider 接口和配置必须由明确任务设计。
 - 模型输出必须接受事实一致性检查。
+
+## ARCH-003 决策补充
+
+第一阶段保留模型 provider 模块：
+
+- `src/career_agent/models/provider.py`
+- `src/career_agent/models/mock_provider.py`
+
+先支持 MockProvider 或 RuleBasedProvider，后续再接 DeepSeek / OpenAI / 本地模型。核心测试不得依赖真实外部模型。

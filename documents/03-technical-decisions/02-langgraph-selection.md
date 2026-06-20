@@ -33,3 +33,14 @@
 
 - 不允许局部 Agent 任务私自引入 LangGraph。
 - 引入前必须更新 workflow 设计和运行手册。
+
+## ARCH-003 决策补充
+
+第一阶段不引入 LangGraph，也不创建实际 `graph_workflow.py`。只实现普通 Python workflow：`src/career_agent/workflows/job_match_workflow.py`。
+
+原因：
+
+- 降低初期实现风险。
+- 先验证 RAG + Agent 业务链路。
+- `AgentTaskState` 可兼容后续 LangGraph。
+- 避免为了框架而框架。

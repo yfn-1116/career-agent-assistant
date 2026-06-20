@@ -10,44 +10,44 @@ Codex
 
 ## 任务目标
 
-集成 loader、chunker、vector store 和 retriever，形成第一阶段 RAG pipeline。
+集成 loader、chunker、VectorStore、retriever，形成第一阶段 `RAGPipeline`。
 
 ## 允许修改文件
 
-- `src/rag/pipeline.py`
-- `src/rag/retriever.py`
+- `src/career_agent/rag/retrievers/__init__.py`
+- `src/career_agent/rag/retrievers/simple_retriever.py`
+- `src/career_agent/rag/pipeline.py`
 - `tests/rag/test_rag_pipeline.py`
 - `documents/97-journal.md`
 - `documents/99-project-planning.md`
 
 ## 禁止修改文件
 
-- `src/agents/`
-- `src/workflows/`
-- Streamlit demo
-- 部署脚本
-- 依赖配置文件，除非任务另有授权
+- `src/career_agent/agents/`
+- `src/career_agent/workflows/`
+- `demo/`
+- `outputs/`
+- `pyproject.toml`
+- `requirements.txt`
 
 ## 输入
 
+- RAG-001 到 RAG-004 的实现。
 - 本地 Markdown 资料路径。
 - 检索 query。
 
 ## 输出
 
-- `RetrievedEvidence` 列表。
+- `SimpleRetriever`
+- `RAGPipeline`
+- pipeline 集成测试。
 
 ## 实现要求
 
-- 使用既有 schema、loader、chunker 和 vector store。
+- 只集成 RAG，不解析 JD。
 - 不生成简历。
-- 不解析 JD。
-
-## 验收标准
-
-- 固定样例 query 能返回相关 evidence。
-- evidence 包含来源路径、quote 和 score。
-- 资料不足时返回空结果或清晰提示。
+- 不调用 Agent workflow。
+- 检索结果返回 `RetrievedEvidence`。
 
 ## 测试命令
 
@@ -56,7 +56,13 @@ pytest tests/rag/test_rag_pipeline.py -v
 git status --short
 ```
 
-## 提交信息建议
+## 验收标准
+
+- 固定 query 能返回相关 evidence。
+- evidence 包含 source、quote、score、reason。
+- 资料不足时返回空结果或清晰提示。
+
+## 建议 commit message
 
 ```text
 feat: integrate rag pipeline

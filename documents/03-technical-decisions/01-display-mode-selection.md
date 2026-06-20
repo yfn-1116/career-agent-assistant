@@ -61,3 +61,12 @@
 - `DEMO-001` 负责 CLI demo。
 - `DEMO-002` 负责 Streamlit demo。
 - 不允许在第一阶段新增 frontend/backend/server 目录。
+
+## ARCH-003 决策补充
+
+第一阶段 demo 层采用：
+
+- `demo/cli/`：CLI demo，优先实现。
+- `demo/streamlit/`：Streamlit 轻量展示，第二步实现。
+
+不采用 `app/streamlit_app.py`，因为 `app/` 容易演化成独立应用层或服务入口，不符合第一阶段“demo 只调用 workflow”的边界。
