@@ -2,6 +2,25 @@
 
 ## 2026-06-20
 
+### AGENT-003 RAGRetrieveAgent
+
+- Executor: Claude Code + DeepSeek
+- Type: implementation / agent-rag-retrieve
+- Summary:
+  - 实现 RAGRetrieveAgent，包装 RAGPipeline。
+  - build_query_from_parsed_jd 从 ParsedJD 构造检索 query。
+  - 支持 retrieve 和 retrieve_by_query 两种检索方式。
+- Changed files:
+  - src/career_agent/agents/rag_retrieve_agent.py
+  - tests/agents/test_rag_retrieve_agent.py
+  - documents/97-journal.md
+  - documents/99-project-planning.md
+- Validation:
+  - 未修改 RAG 模块和已有 Agent。
+  - 110 tests passed (61 RAG + 19 state + 18 jd_parser + 12 rag_retrieve).
+- Next:
+  - AGENT-004 MatchAnalysisAgent
+
 ### AGENT-002 JDParserAgent
 
 - Executor: Claude Code + DeepSeek
