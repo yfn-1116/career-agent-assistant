@@ -2,6 +2,27 @@
 
 ## 2026-06-20
 
+### MODEL-001 Phase B：模型 Provider 实现
+
+- Executor: Claude Code + DeepSeek
+- Type: implementation / model-provider
+- Summary:
+  - 实现 ModelProvider 抽象接口、MockProvider、DeepSeekProvider。
+  - MockProvider 返回固定/可预测文本，记录 prompt。
+  - DeepSeekProvider 使用标准库 urllib 调用 API，从环境变量读取配置。
+  - 17 个 model 测试，全部不依赖真实网络。
+- Changed files:
+  - src/career_agent/models/
+  - tests/models/
+  - documents/97-journal.md
+  - documents/99-project-planning.md
+- Validation:
+  - 182 tests passed（165 已有 + 17 model）。
+  - 无 API Key 时代码不崩溃，仅 generate 时报清晰错误。
+  - 未引入第三方依赖。
+- Next:
+  - Phase C: BuildAgent 可选接入 ModelProvider
+
 ### MODEL-001 模型 Provider 抽象决策文档
 
 - Executor: Claude Code + DeepSeek
