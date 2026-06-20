@@ -2,6 +2,24 @@
 
 ## 2026-06-20
 
+### README 当前状态更新
+
+- Executor: Claude Code + DeepSeek
+- Type: documentation / readme
+- Summary:
+  - 更新 README 反映当前真实项目状态。
+  - 添加已完成模块表、快速运行命令、项目结构总览。
+  - 更新后续开发流程状态标记。
+- Changed files:
+  - README.md
+  - documents/97-journal.md
+  - documents/99-project-planning.md
+- Validation:
+  - 仅更新 README。
+  - 未修改业务代码。
+- Next:
+  - push 到 GitHub。
+
 ### DEMO-DOC-001 Demo 展示文档补强
 
 - Executor: Claude Code + DeepSeek
