@@ -46,6 +46,18 @@ def build_parser() -> argparse.ArgumentParser:
         default=5,
         help="检索返回的 evidence 数量（默认: 5）",
     )
+    p.add_argument(
+        "--use-llm",
+        action="store_true",
+        default=False,
+        help="启用 LLM 增强生成（需设置对应 API_KEY 环境变量）",
+    )
+    p.add_argument(
+        "--model-provider",
+        default="deepseek",
+        choices=["deepseek", "qwen"],
+        help="LLM provider（默认: deepseek，可选: qwen）",
+    )
     return p
 
 
@@ -183,8 +195,43 @@ def main() -> None:
 
     job_text = job_file.read_text(encoding="utf-8")
 
-    # Run workflow
-    wf = JobMatchWorkflow(profile_dir=profile_dir)
+    # Build workflow — optionally with LLM
+    jd_parser = None
+    match_analysis_agent = None
+    build_agent = None
+
+    if args.use_llm:
+        from career_agent.agents.build_agent import BuildAgent
+        from career_agent.agents.jd_parser import JDParserAgent
+        from career_agent.agents.match_analysis_agent import MatchAnalysisAgent
+
+        if args.model_provider == "qwen":
+            from career_agent.models.qwen_provider import QwenProvider
+            try:
+                provider = QwenProvider()
+                jd_parser = JDParserAgent(model_provider=provider, use_llm=True)
+                match_analysis_agent = MatchAnalysisAgent(model_provider=provider, use_llm=True)
+                build_agent = BuildAgent(model_provider=provider, use_llm=True)
+                print(f"🤖 已启用 Qwen LLM（model: {provider.model}）— JD解析 + 匹配分析 + 输出生成")
+            except Exception as e:
+                print(f"⚠️  无法初始化 Qwen：{e}，回退到规则型")
+        else:
+            from career_agent.models.deepseek_provider import DeepSeekProvider
+            try:
+                provider = DeepSeekProvider()
+                jd_parser = JDParserAgent(model_provider=provider, use_llm=True)
+                match_analysis_agent = MatchAnalysisAgent(model_provider=provider, use_llm=True)
+                build_agent = BuildAgent(model_provider=provider, use_llm=True)
+                print(f"🤖 已启用 DeepSeek LLM（model: {provider.model}）— JD解析 + 匹配分析 + 输出生成")
+            except Exception as e:
+                print(f"⚠️  无法初始化 DeepSeek：{e}，回退到规则型")
+
+    wf = JobMatchWorkflow(
+        profile_dir=profile_dir,
+        jd_parser=jd_parser,
+        match_analysis_agent=match_analysis_agent,
+        build_agent=build_agent,
+    )
     state = wf.run(job_text, top_k=args.top_k)
 
     # Print brief summary to terminal
