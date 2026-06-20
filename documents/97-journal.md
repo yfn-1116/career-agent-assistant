@@ -2,6 +2,30 @@
 
 ## 2026-06-20
 
+### RAG-002 Markdown 用户资料加载器
+
+- Executor: Claude Code + DeepSeek
+- Type: implementation / rag-loader
+- Summary:
+  - 实现 MarkdownProfileLoader。
+  - 支持读取单个 Markdown 文件和目录。
+  - 将 Markdown 文件转换为 ProfileDocument。
+  - 添加 loader 单元测试。
+- Changed files:
+  - src/career_agent/rag/loaders/__init__.py
+  - src/career_agent/rag/loaders/markdown_loader.py
+  - tests/rag/test_markdown_loader.py
+  - documents/97-journal.md
+  - documents/99-project-planning.md
+- Validation:
+  - 未修改 RAG schema。
+  - 未实现 chunking/vectorstore/retriever/pipeline。
+  - 测试不依赖外部模型或网络。
+  - 26 tests passed (6 schema + 20 loader).
+- Next:
+  - RAG-003 Text Chunking 可继续由 Claude Code + DeepSeek 实现。
+  - RAG-004 VectorStore interface 建议交给 Codex。
+
 ### SAMPLE-001 示例用户资料与岗位 JD（v2 按新结构重建）
 
 - Executor: Claude Code + DeepSeek

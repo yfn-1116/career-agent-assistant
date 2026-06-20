@@ -30,7 +30,7 @@ Phase 1：文档补强与架构边界定义
 | DOC | DOC-RUNBOOK-001 | 补充 runbook 文档 | Claude Code + DeepSeek | TODO | 本地、GitHub、学校服务器流程 |
 | SAMPLE | SAMPLE-001 | 示例用户资料与岗位 JD | Claude Code + DeepSeek | DONE | 4 份脱敏样例数据，覆盖 Agent 实习场景 |
 | RAG | RAG-001 | 设计 RAG 核心数据结构 | Codex | DONE | 已实现 ProfileItem / ProfileDocument / DocumentChunk / RetrievedEvidence |
-| RAG | RAG-002 | 实现 MarkdownProfileLoader | Claude Code + DeepSeek | NEXT | 依赖 RAG-001 |
+| RAG | RAG-002 | 实现 MarkdownProfileLoader | Claude Code + DeepSeek | DONE | 单文件/目录加载，title提取，item_type推断，20 tests |
 | RAG | RAG-003 | 实现文本清洗与 chunk 切分 | Claude Code + DeepSeek | NEXT | 依赖 RAG-001 |
 | RAG | RAG-004 | 设计并实现 VectorStore 接口 | Codex | NEXT | 核心接口任务 |
 | RAG | RAG-005 | 集成 RAGPipeline | Codex | TODO | 依赖 RAG-002/003/004 |
@@ -51,7 +51,7 @@ Phase 1：文档补强与架构边界定义
 3. ~~ARCH-003 代码目录结构决策。~~ ✅
 4. ~~RAG-001 RAG schema 设计。~~ ✅
 5. ~~SAMPLE-001 示例用户资料与岗位 JD。~~ ✅
-6. RAG-002 Markdown loader。← 下一步，Claude Code + DeepSeek
+6. ~~RAG-002 Markdown loader。~~ ✅
 7. RAG-003 chunking。← 下一步，Claude Code + DeepSeek
 8. RAG-004 VectorStore interface。← 下一步，Codex
 9. RAG-005 RAG pipeline。Codex
