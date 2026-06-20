@@ -2,6 +2,27 @@
 
 ## 2026-06-20
 
+### RAG-001 RAG 核心数据结构设计
+
+- Executor: Codex
+- Type: implementation / schema
+- Summary:
+  - 创建 RAG 核心 schema。
+  - 实现 ProfileItem、ProfileDocument、DocumentChunk、RetrievedEvidence。
+  - 添加 schema 单元测试。
+- Changed files:
+  - src/career_agent/rag/schemas.py
+  - tests/rag/test_schemas.py
+  - documents/97-journal.md
+  - documents/99-project-planning.md
+- Validation:
+  - 仅实现 schema，不实现 loader/chunking/vectorstore/pipeline。
+  - 测试不依赖外部模型或网络。
+- Next:
+  - RAG-002 Markdown Loader 可交给 Claude Code + DeepSeek。
+  - RAG-003 Text Chunking 可交给 Claude Code + DeepSeek。
+  - RAG-004 VectorStore interface 建议交给 Codex。
+
 ### ARCH-003 代码目录结构决策与第一阶段工程骨架规划
 
 - Executor: Codex

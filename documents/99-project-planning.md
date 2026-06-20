@@ -29,10 +29,10 @@ Phase 1：文档补强与架构边界定义
 | ARCH | ARCH-003 | 代码目录结构决策 | Codex | DONE | 采用 src/career_agent；ARCH-003 不创建 pyproject；demo 使用 demo/cli 与 demo/streamlit |
 | DOC | DOC-RUNBOOK-001 | 补充 runbook 文档 | Claude Code + DeepSeek | TODO | 本地、GitHub、学校服务器流程 |
 | SAMPLE | SAMPLE-001 | 示例用户资料与岗位 JD | Claude Code + DeepSeek | NEXT | 只写 data/samples/ 示例资料 |
-| RAG | RAG-001 | 设计 RAG 核心数据结构 | Codex | NEXT | ProfileItem / ProfileDocument / DocumentChunk / RetrievedEvidence |
-| RAG | RAG-002 | 实现 MarkdownProfileLoader | Claude Code + DeepSeek | TODO | 依赖 RAG-001 |
-| RAG | RAG-003 | 实现文本清洗与 chunk 切分 | Claude Code + DeepSeek | TODO | 依赖 RAG-001 |
-| RAG | RAG-004 | 设计并实现 VectorStore 接口 | Codex | TODO | 核心接口任务 |
+| RAG | RAG-001 | 设计 RAG 核心数据结构 | Codex | DONE | 已实现 ProfileItem / ProfileDocument / DocumentChunk / RetrievedEvidence |
+| RAG | RAG-002 | 实现 MarkdownProfileLoader | Claude Code + DeepSeek | NEXT | 依赖 RAG-001 |
+| RAG | RAG-003 | 实现文本清洗与 chunk 切分 | Claude Code + DeepSeek | NEXT | 依赖 RAG-001 |
+| RAG | RAG-004 | 设计并实现 VectorStore 接口 | Codex | NEXT | 核心接口任务 |
 | RAG | RAG-005 | 集成 RAGPipeline | Codex | TODO | 依赖 RAG-002/003/004 |
 | AGENT | AGENT-001 | 设计 AgentTaskState | Codex | NEXT | 多 Agent 状态核心 |
 | AGENT | AGENT-002 | 实现 JDParserAgent | Claude Code + DeepSeek | TODO | 只解析 JD |
@@ -49,11 +49,11 @@ Phase 1：文档补强与架构边界定义
 1. ~~ARCH-002 开源项目调研与参考架构沉淀。~~ ✅
 2. ~~DOC-REFERENCE-001 补充参考项目文档。~~ ✅
 3. ~~ARCH-003 代码目录结构决策。~~ ✅
-4. RAG-001 RAG schema 设计。← 下一步，Codex
+4. ~~RAG-001 RAG schema 设计。~~ ✅
 5. SAMPLE-001 示例用户资料与岗位 JD。← 下一步，Claude Code + DeepSeek
-6. RAG-002 Markdown loader。Claude Code + DeepSeek
-7. RAG-003 chunking。Claude Code + DeepSeek
-8. RAG-004 VectorStore interface。Codex
+6. RAG-002 Markdown loader。← 下一步，Claude Code + DeepSeek
+7. RAG-003 chunking。← 下一步，Claude Code + DeepSeek
+8. RAG-004 VectorStore interface。← 下一步，Codex
 9. RAG-005 RAG pipeline。Codex
 10. AGENT-001 AgentTaskState 设计。Codex
 11. AGENT-002 JDParserAgent。
