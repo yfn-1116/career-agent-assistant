@@ -2,6 +2,31 @@
 
 ## 2026-06-20
 
+### RAG-005 RAGPipeline 集成
+
+- Executor: Codex
+- Type: implementation / rag-pipeline
+- Summary:
+  - 实现 SimpleRetriever。
+  - 实现 RAGPipeline。
+  - 串联 MarkdownProfileLoader、TextChunker、MemoryVectorStore。
+  - 支持从本地 Markdown 目录构建索引并返回 RetrievedEvidence。
+- Changed files:
+  - src/career_agent/rag/retrievers/__init__.py
+  - src/career_agent/rag/retrievers/simple_retriever.py
+  - src/career_agent/rag/pipeline.py
+  - tests/rag/test_rag_pipeline.py
+  - documents/97-journal.md
+  - documents/99-project-planning.md
+- Validation:
+  - 未修改 schema、loader、chunking、vectorstore。
+  - 未实现 Agent 或 workflow。
+  - 未引入 Chroma / FAISS / LangChain / LangGraph。
+  - 测试不依赖外部模型或网络。
+- Next:
+  - AGENT-001 AgentTaskState 建议交给 Codex。
+  - AGENT-002 JDParserAgent 可交给 Claude Code + DeepSeek。
+
 ### RAG-004 VectorStore 接口与 MemoryVectorStore
 
 - Executor: Codex

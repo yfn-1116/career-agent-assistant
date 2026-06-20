@@ -33,7 +33,7 @@ Phase 1：文档补强与架构边界定义
 | RAG | RAG-002 | 实现 MarkdownProfileLoader | Claude Code + DeepSeek | DONE | 单文件/目录加载，title提取，item_type推断，20 tests |
 | RAG | RAG-003 | 实现文本清洗与 chunk 切分 | Claude Code + DeepSeek | DONE | clean + 字符切分 + overlap，23 tests |
 | RAG | RAG-004 | 设计并实现 VectorStore 接口 | Codex | DONE | VectorStore + MemoryVectorStore，7 tests |
-| RAG | RAG-005 | 集成 RAGPipeline | Codex | NEXT | 依赖 RAG-002/003/004 |
+| RAG | RAG-005 | 集成 RAGPipeline | Codex | DONE | Markdown loader + chunker + MemoryVectorStore + SimpleRetriever，5 tests |
 | AGENT | AGENT-001 | 设计 AgentTaskState | Codex | NEXT | 多 Agent 状态核心 |
 | AGENT | AGENT-002 | 实现 JDParserAgent | Claude Code + DeepSeek | TODO | 只解析 JD |
 | AGENT | AGENT-003 | 实现 RAGRetrieveAgent | Claude Code + DeepSeek | TODO | 只调用 RAG pipeline |
@@ -54,8 +54,8 @@ Phase 1：文档补强与架构边界定义
 6. ~~RAG-002 Markdown loader。~~ ✅
 7. ~~RAG-003 chunking。~~ ✅
 8. ~~RAG-004 VectorStore interface。~~ ✅
-9. RAG-005 RAG pipeline。← 下一步，Codex
-10. AGENT-001 AgentTaskState 设计。Codex
+9. ~~RAG-005 RAG pipeline。~~ ✅
+10. AGENT-001 AgentTaskState 设计。← 下一步，Codex
 11. AGENT-002 JDParserAgent。
 12. AGENT-003 RAGRetrieveAgent。
 13. AGENT-004 MatchAnalysisAgent。
