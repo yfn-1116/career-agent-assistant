@@ -2,6 +2,25 @@
 
 ## 2026-06-20
 
+### EVAL-001 评估数据结构与基础规则
+
+- Executor: Claude Code + DeepSeek
+- Type: implementation / evaluation
+- Summary:
+  - 新增 EvaluationItem / EvaluationReport 数据结构。
+  - 新增 5 条轻量评估规则（status/evidence count/output non-empty/refs/coverage）。
+  - 18 个评估测试全部通过。
+- Changed files:
+  - src/career_agent/evaluation/
+  - tests/evaluation/test_evaluation_rules.py
+  - documents/97-journal.md
+- Validation:
+  - 未修改 RAG / Agent / Workflow 核心逻辑。
+  - 未调用外部模型或网络。
+  - 208 tests passed.
+- Next:
+  - EVAL-002 多 JD 评估 runner
+
 ### MODEL-002 BuildAgent 可选模型生成
 
 - Executor: Claude Code + DeepSeek
