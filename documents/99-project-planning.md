@@ -34,7 +34,7 @@ Phase 1：文档补强与架构边界定义
 | RAG | RAG-003 | 实现文本清洗与 chunk 切分 | Claude Code + DeepSeek | DONE | clean + 字符切分 + overlap，23 tests |
 | RAG | RAG-004 | 设计并实现 VectorStore 接口 | Codex | DONE | VectorStore + MemoryVectorStore，7 tests |
 | RAG | RAG-005 | 集成 RAGPipeline | Codex | DONE | Markdown loader + chunker + MemoryVectorStore + SimpleRetriever，5 tests |
-| AGENT | AGENT-001 | 设计 AgentTaskState | Codex | NEXT | 多 Agent 状态核心 |
+| AGENT | AGENT-001 | 设计 AgentTaskState | Claude Code + DeepSeek | DONE | 4 dataclass，19 tests |
 | AGENT | AGENT-002 | 实现 JDParserAgent | Claude Code + DeepSeek | TODO | 只解析 JD |
 | AGENT | AGENT-003 | 实现 RAGRetrieveAgent | Claude Code + DeepSeek | TODO | 只调用 RAG pipeline |
 | AGENT | AGENT-004 | 实现 MatchAnalysisAgent | Claude Code + DeepSeek | TODO | 只做匹配分析 |

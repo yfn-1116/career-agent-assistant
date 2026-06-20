@@ -2,6 +2,28 @@
 
 ## 2026-06-20
 
+### AGENT-001 AgentTaskState 设计
+
+- Executor: Claude Code + DeepSeek
+- Type: implementation / agent-state
+- Summary:
+  - 实现 ParsedJD、MatchAnalysisResult、GeneratedOutput、AgentTaskState 四个 dataclass。
+  - 使用 default_factory 避免可变对象共享。
+  - task_id 自动生成，status 默认为 created。
+  - retrieved_evidence 使用已有 RetrievedEvidence 类型。
+- Changed files:
+  - src/career_agent/agents/__init__.py
+  - src/career_agent/agents/state.py
+  - tests/agents/test_state.py
+  - documents/97-journal.md
+  - documents/99-project-planning.md
+- Validation:
+  - 未修改 RAG 模块。
+  - 未实现 Agent 逻辑。
+  - 80 tests passed (61 RAG + 19 state).
+- Next:
+  - AGENT-002 JDParserAgent
+
 ### RAG-005 RAGPipeline 集成
 
 - Executor: Codex
