@@ -19,6 +19,17 @@ PYTHONPATH=src python demo/evaluation/run_evaluation.py
 cat outputs/demo/evaluation_report.md
 ```
 
+## 关键词检索 vs Embedding 检索
+
+| 维度 | MemoryVectorStore | EmbeddingVectorStore |
+|---|---|---|
+| 匹配方式 | 关键词 Token 重叠 | Hash trigram 余弦相似度 |
+| 语义理解 | 无 | 有限（trigram 共享子串） |
+| 外部依赖 | 无 | 无 |
+| 生产可用 | 否 | 否 |
+
+当前默认使用 MemoryVectorStore。EmbeddingVectorStore 是可选验证路径，不等同于生产级语义检索。
+
 ## 后续增强方向
 
 - 建立小型人工标注集（标注"这条 evidence 是否真的与 JD 相关"）

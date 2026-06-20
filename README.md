@@ -109,6 +109,17 @@ docs/superpowers/  # AI 协作规范与任务卡
 
 后续可扩展远程 GitHub API 读取。
 
+## 可选 Embedding 检索
+
+当前默认 RAGPipeline 使用 MemoryVectorStore（关键词检索），保证稳定可复现。
+
+项目已新增 **EmbeddingProvider** 抽象层：
+
+- `HashEmbeddingProvider`：本地 hash 伪向量，不调用外部模型
+- `EmbeddingVectorStore`：余弦相似度检索
+
+当前用于验证 embedding → 检索的接口链路，**不是生产级语义检索**。后续可替换为 DeepSeek/OpenAI embedding 并接入 Chroma/FAISS。
+
 ## 后续开发计划
 
 ```text
