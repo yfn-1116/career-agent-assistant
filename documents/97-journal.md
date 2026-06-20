@@ -2,6 +2,34 @@
 
 ## 2026-06-20
 
+### REVIEW-002 / PRESENTATION-001 / RESUME-001 最终审查与展示材料
+
+- Executor: Claude Code + DeepSeek
+- Type: review / presentation
+- Summary:
+  - 最终项目审查：完成度 95%，216 tests，全部规划模块完成。
+  - 风险检查清单：10 项全部通过，无阻塞问题。
+  - 5-8 分钟口语化展示脚本。
+  - 简历项目描述（4 个版本）+ 可写/不可写清单。
+  - GitHub README 审查建议。
+- Changed files:
+  - documents/07-review/04-final-project-review.md
+  - documents/07-review/05-final-risk-checklist.md
+  - documents/08-presentation/06-final-demo-script.md
+  - documents/08-presentation/07-resume-polish.md
+  - documents/08-presentation/08-github-readme-review.md
+  - documents/97-journal.md
+  - documents/99-project-planning.md
+- Validation:
+  - 本轮未修改核心代码。
+  - 所有表述基于当前真实能力。
+  - 无夸大、无虚构。
+  - 216 tests passed.
+- Next:
+  - 可选：添加 README 截图和架构图
+  - 可选：GitHub Repo Agent
+  - 可选：Embedding 检索
+
 ### EVAL-003 评估文档补充
 
 - Executor: Claude Code + DeepSeek
