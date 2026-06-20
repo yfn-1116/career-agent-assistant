@@ -2,6 +2,31 @@
 
 ## 2026-06-20
 
+### RAG-003 文本清洗与 Chunk 切分
+
+- Executor: Claude Code + DeepSeek
+- Type: implementation / rag-chunking
+- Summary:
+  - 实现 TextChunker。
+  - 支持文本清洗、单文档切分、多文档切分、overlap。
+  - 将 ProfileDocument 转换为 DocumentChunk。
+  - 添加 chunking 单元测试。
+- Changed files:
+  - src/career_agent/rag/chunking/__init__.py
+  - src/career_agent/rag/chunking/text_chunker.py
+  - tests/rag/test_text_chunker.py
+  - documents/97-journal.md
+  - documents/99-project-planning.md
+- Validation:
+  - 未修改 RAG schema。
+  - 未修改 MarkdownProfileLoader。
+  - 未实现 vectorstore/retriever/pipeline。
+  - 测试不依赖外部模型或网络。
+  - 49 tests passed (6 schema + 20 loader + 23 chunker).
+- Next:
+  - RAG-004 VectorStore interface 建议交给 Codex。
+  - RAG-005 RAG Pipeline 建议交给 Codex。
+
 ### RAG-002 Markdown 用户资料加载器
 
 - Executor: Claude Code + DeepSeek

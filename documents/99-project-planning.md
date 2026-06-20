@@ -31,7 +31,7 @@ Phase 1：文档补强与架构边界定义
 | SAMPLE | SAMPLE-001 | 示例用户资料与岗位 JD | Claude Code + DeepSeek | DONE | 4 份脱敏样例数据，覆盖 Agent 实习场景 |
 | RAG | RAG-001 | 设计 RAG 核心数据结构 | Codex | DONE | 已实现 ProfileItem / ProfileDocument / DocumentChunk / RetrievedEvidence |
 | RAG | RAG-002 | 实现 MarkdownProfileLoader | Claude Code + DeepSeek | DONE | 单文件/目录加载，title提取，item_type推断，20 tests |
-| RAG | RAG-003 | 实现文本清洗与 chunk 切分 | Claude Code + DeepSeek | NEXT | 依赖 RAG-001 |
+| RAG | RAG-003 | 实现文本清洗与 chunk 切分 | Claude Code + DeepSeek | DONE | clean + 字符切分 + overlap，23 tests |
 | RAG | RAG-004 | 设计并实现 VectorStore 接口 | Codex | NEXT | 核心接口任务 |
 | RAG | RAG-005 | 集成 RAGPipeline | Codex | TODO | 依赖 RAG-002/003/004 |
 | AGENT | AGENT-001 | 设计 AgentTaskState | Codex | NEXT | 多 Agent 状态核心 |
@@ -52,7 +52,7 @@ Phase 1：文档补强与架构边界定义
 4. ~~RAG-001 RAG schema 设计。~~ ✅
 5. ~~SAMPLE-001 示例用户资料与岗位 JD。~~ ✅
 6. ~~RAG-002 Markdown loader。~~ ✅
-7. RAG-003 chunking。← 下一步，Claude Code + DeepSeek
+7. ~~RAG-003 chunking。~~ ✅
 8. RAG-004 VectorStore interface。← 下一步，Codex
 9. RAG-005 RAG pipeline。Codex
 10. AGENT-001 AgentTaskState 设计。Codex
