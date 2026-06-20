@@ -2,6 +2,27 @@
 
 ## 2026-06-20
 
+### PRESENTATION-001 展示材料整理 + 文档一致性修复
+
+- Executor: Claude Code + DeepSeek
+- Type: documentation / presentation
+- Summary:
+  - 创建答辩/展示大纲（10-12 分钟完整流程 + 备用方案）。
+  - 创建简历表达参考（按 RAG/Agent/工程/架构 4 个侧重点提供 bullet）。
+  - 完成 README 与代码一致性检查，确认无过时描述。
+- Changed files:
+  - documents/07-review/04-presentation-outline.md
+  - documents/07-review/05-resume-bullets.md
+  - documents/97-journal.md
+  - documents/99-project-planning.md
+- Validation:
+  - 未修改任何 src/ 或 tests/ 代码。
+  - README 与实际代码状态一致。
+  - 所有文档描述基于真实已完成的功能。
+- Next:
+  - 可选：接入 LLM API
+  - 可选：LangGraph 迁移
+
 ### REVIEW-001 项目整体审查
 
 - Executor: Claude Code + DeepSeek
