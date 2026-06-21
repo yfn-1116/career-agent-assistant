@@ -66,6 +66,7 @@ class JobMatchState(TypedDict):
     retry_history: list[dict[str, Any]]
     query_rewrite_reason: str
     fallback_reason: str
+    tool_trace: list[dict[str, Any]]
     next_action: str
     top_k: int
     profile_dir: str
@@ -83,7 +84,7 @@ def _initial_state(
         decision="continue", match_analysis=None, generated_result=None,
         faithfulness_report=None, report_path="", trace_id=uuid.uuid4().hex[:12],
         logs=[], retry_count=0, max_retries=max_retries, retry_history=[],
-        query_rewrite_reason="", fallback_reason="", next_action="parse_jd",
+        query_rewrite_reason="", fallback_reason="", tool_trace=[], next_action="parse_jd",
         top_k=top_k, profile_dir=profile_dir, output_dir=output_dir,
         status="running", error_message="",
     )
@@ -117,7 +118,9 @@ def parse_jd_node(state, *, ctx):
     _log(state, "parse_jd_node")
     parsed = ctx.jd_parser.parse(state["raw_jd"])
     state["logs"].append(f"parse_jd: title={parsed.job_title}, direction={parsed.job_direction}")
-    return {"parsed_jd": parsed, "next_action": "rewrite_query"}
+    tr = _record_tool_call(state, "parse_jd", input_summary=f"jd {len(state['raw_jd'])} chars",
+                           output_summary=f"title={parsed.job_title}, direction={parsed.job_direction}")
+    return {"parsed_jd": parsed, "next_action": "rewrite_query", "tool_trace": tr["tool_trace"]}
 
 
 def rewrite_query_node(state, *, ctx):
@@ -137,9 +140,11 @@ def rewrite_query_node(state, *, ctx):
         reason = "initial query from parsed JD"
 
     state["logs"].append(f"rewrite_query: query='{query[:120]}'")
+    tr = _record_tool_call(state, "rewrite_query", input_summary=f"retry={retry_count}", output_summary=query[:100])
     return {
         "queries": [query], "retry_count": retry_count + 1,
         "query_rewrite_reason": reason, "next_action": "retrieve_context",
+        "tool_trace": tr["tool_trace"],
     }
 
 
@@ -179,11 +184,13 @@ def retrieve_context_node(state, *, ctx):
                           "metadata_score": dc.metadata_score, "final_hybrid_score": dc.final_hybrid_score},
             ))
         state["logs"].append(f"retrieve_context (hybrid): {len(evidence_list)} chunks")
-        return {"retrieved_chunks": evidence_list, "next_action": "rerank"}
+        tr = _record_tool_call(state, "retrieve_profile", input_summary=query[:80], output_summary=f"{len(evidence_list)} chunks (hybrid)")
+        return {"retrieved_chunks": evidence_list, "next_action": "rerank", "tool_trace": tr["tool_trace"]}
 
     chunks = ctx.rag_pipeline.retrieve(query, top_k=top_k)
     state["logs"].append(f"retrieve_context: {len(chunks)} chunks")
-    return {"retrieved_chunks": chunks, "next_action": "rerank"}
+    tr = _record_tool_call(state, "retrieve_profile", input_summary=query[:80], output_summary=f"{len(chunks)} chunks")
+    return {"retrieved_chunks": chunks, "next_action": "rerank", "tool_trace": tr["tool_trace"]}
 
 
 def rerank_node(state, *, ctx):
@@ -235,7 +242,8 @@ def rerank_node(state, *, ctx):
         ))
 
     state["logs"].append(f"rerank: {len(result)} chunks (from {len(chunks)})")
-    return {"reranked_chunks": result, "retrieved_chunks": result, "next_action": "grade_retrieval"}
+    tr = _record_tool_call(state, "rerank_chunks", input_summary=f"{len(chunks)} chunks", output_summary=f"{len(result)} reranked")
+    return {"reranked_chunks": result, "retrieved_chunks": result, "next_action": "grade_retrieval", "tool_trace": tr["tool_trace"]}
 
 
 def grade_retrieval_node(state, *, ctx):  # noqa: ARG001
@@ -259,8 +267,10 @@ def grade_retrieval_node(state, *, ctx):  # noqa: ARG001
 
     state["logs"].append(f"grade_retrieval: round={history[-1]['round']}, grade={report.grade}, "
                          f"score={total_score:.2f}, decision={decision}")
+    tr = _record_tool_call(state, "grade_retrieval", input_summary=f"{len(chunks)} evidence", output_summary=f"grade={report.grade} score={total_score:.2f}")
     return {"retrieval_scores": report, "missing_keywords": missing,
-            "decision": decision, "retry_history": history, "next_action": decision}
+            "decision": decision, "retry_history": history, "next_action": decision,
+            "tool_trace": tr["tool_trace"]}
 
 
 def analyze_match_node(state, *, ctx):
@@ -320,7 +330,8 @@ def check_faithfulness_node(state, *, ctx):
     state["logs"].append(f"faithfulness: score={report.faithfulness_score:.2f}, "
                          f"decision={report.decision}, "
                          f"unsupported={len(report.unsupported_claims)}")
-    return {"faithfulness_report": report, "next_action": "write_report"}
+    tr = _record_tool_call(state, "check_faithfulness", input_summary=f"{len(bullets)} bullets", output_summary=f"score={report.faithfulness_score:.2f} {report.decision}")
+    return {"faithfulness_report": report, "next_action": "write_report", "tool_trace": tr["tool_trace"]}
 
 
 def write_report_node(state, *, ctx):  # noqa: ARG001
@@ -337,7 +348,10 @@ def write_report_node(state, *, ctx):  # noqa: ARG001
     diag_path = write_diagnostics(dict(state), output_dir=str(output_dir.parent / "diagnostics"))
     state["logs"].append(f"write_report: {report_path}, diagnostics: {diag_path}")
 
-    return {"report_path": str(report_path), "status": "completed", "next_action": "end"}
+    tr = _record_tool_call(state, "write_report", output_summary=str(report_path))
+    tr2 = _record_tool_call(state, "write_diagnostics", output_summary=str(diag_path))
+    merged_trace = list(tr.get("tool_trace", []))
+    return {"report_path": str(report_path), "status": "completed", "next_action": "end", "tool_trace": merged_trace}
 
 
 # ---------------------------------------------------------------------------
@@ -401,6 +415,15 @@ def fallback_node(state, *, ctx):  # noqa: ARG001
 
 def _log(state, node):
     state.setdefault("logs", []).append(f"[{datetime.now(timezone.utc).isoformat()}] {node}")
+
+
+def _record_tool_call(state, tool_name, input_summary="", output_summary="", success=True, error="", duration_ms=0.0):
+    """Record a ToolCallTrace entry. Returns ``{"tool_trace": [...]}`` for LangGraph merging."""
+    trace: list[dict[str, Any]] = list(state.get("tool_trace", []))
+    trace.append({"tool_name": tool_name, "input_summary": input_summary,
+                  "output_summary": output_summary, "duration_ms": duration_ms,
+                  "success": success, "error": error, "state_changes": []})
+    return {"tool_trace": trace}
 
 
 def _collect_missing_keywords(report, parsed_jd):
@@ -603,3 +626,82 @@ def run_langgraph_workflow(
     initial = _initial_state(raw_jd=raw_jd, top_k=top_k,
                              profile_dir=str(profile_dir), output_dir=str(output_dir))
     return app.invoke(initial)
+
+
+def run_langgraph_workflow_with_tools(
+    raw_jd="", *, top_k=5, profile_dir="", output_dir="outputs/demo",
+) -> dict[str, Any]:
+    """Run via ToolRegistry + ControlledPlanner with full tool-trace recording."""
+    import time as _time
+    from career_agent.tools.registry import create_standard_registry
+    from career_agent.tools.planner import ControlledPlanner
+
+    reg = create_standard_registry()
+    planner = ControlledPlanner()
+    state: dict[str, Any] = {
+        "raw_jd": raw_jd, "parsed_jd": None, "queries": [],
+        "retrieved_chunks": [], "reranked_chunks": [],
+        "retrieval_scores": None, "missing_keywords": [],
+        "decision": "continue", "match_analysis": None,
+        "generated_result": None, "faithfulness_report": None,
+        "report_path": "", "diagnostics_path": "",
+        "retry_count": 0, "max_retries": 2,
+        "top_k": top_k, "profile_dir": str(profile_dir),
+        "output_dir": str(output_dir),
+        "trace_id": uuid.uuid4().hex[:12],
+        "tool_trace": [], "logs": [], "status": "running",
+    }
+
+    _STATE_KEYS = {
+        "parsed_jd", "queries", "retrieved_chunks", "reranked_chunks",
+        "retrieval_scores", "match_analysis", "generated_result",
+        "faithfulness_report", "report_path", "diagnostics_path",
+        "retry_count", "decision", "fallback_reason",
+    }
+
+    for _ in range(20):
+        decision = planner.decide(state)
+        if decision.next_tool == "done":
+            state["status"] = "completed"
+            break
+        kwargs = {}
+        tn = decision.next_tool
+        if tn == "parse_jd": kwargs["raw_jd"] = state.get("raw_jd", "")
+        elif tn in ("plan_queries",): kwargs["parsed_jd"] = state.get("parsed_jd")
+        elif tn == "rewrite_query":
+            kwargs["parsed_jd"] = state.get("parsed_jd"); kwargs["missing_keywords"] = state.get("missing_keywords", [])
+            kwargs["previous_query"] = state["queries"][-1] if state.get("queries") else ""
+            kwargs["retry_count"] = state.get("retry_count", 0)
+        elif tn == "retrieve_profile":
+            kwargs["queries"] = state.get("queries", []); kwargs["top_k"] = state.get("top_k", 5)
+            kwargs["profile_dir"] = state.get("profile_dir", "")
+        elif tn == "rerank_chunks":
+            kwargs["retrieved_chunks"] = state.get("retrieved_chunks", []); kwargs["parsed_jd"] = state.get("parsed_jd")
+        elif tn == "grade_retrieval":
+            kwargs["query"] = state["queries"][-1] if state.get("queries") else ""
+            kwargs["evidence"] = state.get("retrieved_chunks", []); kwargs["parsed_jd"] = state.get("parsed_jd")
+        elif tn in ("analyze_match",):
+            kwargs["parsed_jd"] = state.get("parsed_jd"); kwargs["retrieved_chunks"] = state.get("retrieved_chunks", [])
+        elif tn == "generate_grounded_answer":
+            kwargs["parsed_jd"] = state.get("parsed_jd"); kwargs["retrieved_chunks"] = state.get("retrieved_chunks", [])
+            kwargs["match_analysis"] = state.get("match_analysis")
+        elif tn == "check_faithfulness":
+            kwargs["generated_result"] = state.get("generated_result"); kwargs["retrieved_chunks"] = state.get("retrieved_chunks", [])
+        elif tn == "fallback":
+            kwargs["missing_keywords"] = state.get("missing_keywords", [])
+            kwargs["retry_count"] = state.get("retry_count", 0); kwargs["max_retries"] = 2
+            kwargs["output_dir"] = state.get("output_dir", "/tmp")
+        elif tn in ("write_report", "write_diagnostics"):
+            kwargs["state"] = state; kwargs["output_dir"] = state.get("output_dir", "outputs/demo")
+        t0 = _time.perf_counter()
+        result = reg.invoke(tn, **kwargs)
+        elapsed = (_time.perf_counter() - t0) * 1000
+        trace = list(state.get("tool_trace", []))
+        trace.append({"tool_name": tn, "input_summary": decision.reason, "output_summary": result.summary,
+                       "duration_ms": round(elapsed, 2), "success": result.success, "error": result.error})
+        state["tool_trace"] = trace
+        if result.success:
+            for k in _STATE_KEYS & set(result.output.keys()):
+                state[k] = result.output[k]
+        state.setdefault("logs", []).append(f"[tool] {tn}: {result.summary}")
+    return state

@@ -293,3 +293,53 @@ def test_report_contains_retry_history():
         assert "Query Rewrite History" in content
         assert "query1" in content
         assert "0.45" in content
+
+
+# ---------------------------------------------------------------------------
+# Tool trace tests (Agent-3)
+# ---------------------------------------------------------------------------
+
+
+def test_tool_trace_is_recorded():
+    """Running the workflow must populate tool_trace."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        state = run_langgraph_workflow(
+            raw_jd=SAMPLE_JD, top_k=3, profile_dir=PROFILE_DIR, output_dir=tmpdir,
+        )
+        trace = state.get("tool_trace", [])
+        assert len(trace) > 0, "tool_trace must not be empty"
+        tool_names = [t["tool_name"] for t in trace]
+        assert "parse_jd" in tool_names
+        assert "grade_retrieval" in tool_names
+        assert "write_report" in tool_names
+
+
+def test_tool_trace_has_required_fields():
+    """Each trace entry must have required fields."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        state = run_langgraph_workflow(
+            raw_jd=SAMPLE_JD, top_k=2, profile_dir=PROFILE_DIR, output_dir=tmpdir,
+        )
+        for t in state.get("tool_trace", []):
+            assert "tool_name" in t
+            assert "input_summary" in t
+            assert "output_summary" in t
+            assert "success" in t
+            assert "error" in t
+            assert isinstance(t["success"], bool)
+
+
+def test_run_with_tools_produces_trace():
+    """run_langgraph_workflow_with_tools uses ToolRegistry and records trace."""
+    from career_agent.workflows.langgraph_workflow import run_langgraph_workflow_with_tools
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        state = run_langgraph_workflow_with_tools(
+            raw_jd=SAMPLE_JD, top_k=2, profile_dir=PROFILE_DIR, output_dir=tmpdir,
+        )
+        trace = state.get("tool_trace", [])
+        assert len(trace) >= 5, f"Expected >=5 tool calls, got {len(trace)}"
+        # Each trace entry should have duration_ms
+        for t in trace:
+            assert "duration_ms" in t
+            assert "tool_name" in t
