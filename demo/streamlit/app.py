@@ -211,36 +211,50 @@ RAG 检索: {result.final_answer[:2000]}
 
             else:
                 # === 对话模式：LLM + 知识库检索 ===
-                # 1. RAG 检索相关知识
+                # 1. RAG 检索 + 列出知识库文件
                 rag_context = ""
-                if st.session_state.kb_chunks > 0 and "kw_store" in st.session_state:
-                    try:
-                        evidence = st.session_state.kw_store.search(user_input, top_k=3)
+                # 列出知识库里有哪些文件
+                try:
+                    sources = set()
+                    if "kw_store" in st.session_state and st.session_state.kb_chunks > 0:
+                        evidence = st.session_state.kw_store.search(user_input, top_k=5)
                         rag_context = "\n".join(
                             f"[{e.source_path}] {e.content[:200]}" for e in evidence
                         )
-                    except Exception:
-                        pass
+                        for e in evidence:
+                            sources.add(e.source_path)
+                    # 告诉 LLM 知识库里有哪些文件
+                    all_sources = set()
+                    if KB_FILE.exists():
+                        import json as _json
+                        with open(KB_FILE) as f:
+                            for line in f:
+                                if line.strip():
+                                    s = _json.loads(line).get("source_path","")
+                                    if s: all_sources.add(s)
+                    if all_sources:
+                        rag_context = f"知识库文件列表: {sorted(all_sources)}\n\n检索结果:\n{rag_context}"
+                except Exception:
+                    pass
 
                 # 2. LLM 回答
                 ctx = f"""你是用户的求职顾问，像朋友一样聊天。简洁、真诚。
 
-你的知识库包含用户以下资料:
-- GitHub 仓库: {', '.join(st.session_state.github_repos) if st.session_state.github_repos else '暂无'}
-- 资料库: {st.session_state.kb_chunks} 条已索引内容
-- 用户画像: {st.session_state.profile_summary or '待分析'}
+你的知识库:
+- GitHub: {', '.join(st.session_state.github_repos) if st.session_state.github_repos else '暂无'}
+- {st.session_state.kb_chunks} 条已索引内容
+- {st.session_state.profile_summary or ''}
 
-知识库检索到的相关内容:
-{rag_context or '未检索到相关内容'}
+{rag_context}
 
 用户问: {user_input}
 
 规则:
-- 如果用户问「能看到我的仓库吗」，如实说能看到的仓库名，并说出仓库的主要内容
-- 基于检索到的内容回答，能引用具体的文件名
-- 如果信息不足，诚实说「你的资料库里还没有相关内容，可以上传更多资料」
+- 知识库文件列表里的文件就是用户上传的资料，如实告诉用户你有哪些资料
+- 如果用户问「看到我的简历了吗」，检查文件列表里有没有 PDF 文件，如实说有或没有
+- 基于检索内容回答，引用具体文件名
 - 像朋友聊天，不要列太多 bullet point"""
-                answer = _llm(ctx, "你是求职顾问，像朋友一样聊天。能看到用户的GitHub和资料库。简洁、真诚。") or "抱歉，LLM 不可用。"
+                answer = _llm(ctx, "你是求职顾问，能看到用户上传的所有资料。简洁、真诚。") or "抱歉，LLM 不可用。"
 
             st.markdown(answer)
             st.session_state.messages.append({"role": "assistant", "content": answer})
