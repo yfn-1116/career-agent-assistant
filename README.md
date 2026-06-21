@@ -1,17 +1,33 @@
-# career-agent-assistant
+# Evidence-grounded Job Matching Agent
+
+基于证据约束的智能求职匹配 Agent。
 
 ## 项目定位
 
-`career-agent-assistant` 是一个面向大学生实习求职场景的 RAG + 多 Agent MVP 原型。它不是完整求职平台，也不是普通简历生成器，而是用来验证个人能力知识库、岗位理解、匹配分析和求职材料生成这一条核心链路。
+**不是**：GPT 包装壳、简历生成器、自动投递机器人、一次性 JD 分析工具。
 
-## 核心模块
+**是**：
+- 维护用户**长期求职资料库**，区分"已实现/设计/计划/证据不足"；
+- 根据 JD **自动检索真实经历**，每条建议绑定 evidence/source；
+- **Evidence Gate** 阻止把"设计了"写成"实现了"，阻止编造经历；
+- 输出**可追溯 diagnostics 和 report**；
+- **长期追踪能力缺口**，告诉用户该补什么项目；
+- **批量岗位匹配和投递记录**。
 
-- **RAG 用户资料知识库**：将本地 Markdown 简历、项目经历、GitHub 仓库摘要、课程项目、实习经历、技能材料等整理为可检索资料。
-- **多 Agent 编排**：围绕 JD 解析、资料检索、匹配分析、简历项目描述生成、HR / mentor 沟通话术生成等任务拆分职责。
-- **文档先行工程流程**：所有实现任务先进入 `documents/` 和 `docs/superpowers/`，再进入代码实现。
-- **本地开发到服务器展示**：本地验证后推送 GitHub，再由学校服务器拉取并复现 demo。
+## 核心能力
 
-## 第一阶段目标
+| 模块 | 功能 |
+|------|------|
+| Profile Knowledge Base | 结构化用户资料 (implemented/designed/planned/uncertain) |
+| Evidence Gate | 校验生成内容是否符合 evidence 状态，降级/阻止不合规 claims |
+| Hybrid RAG | 关键词 + 语义并行检索 + Reranker + 评分 |
+| Job Matching Scorer | 5 因子评分 (coverage + evidence + relevance + confidence + gap) |
+| Agentic Retry | 低分自动 rewrite_query 重试，耗尽后 fallback |
+| Tool Registry | 15 个注册工具，受控调用 |
+| Application Memory | JSONL 持久化投递记录 |
+| Capability Gap | 跨岗位技能缺口分析 |
+| Faithfulness | 生成内容忠实度检查 |
+| Diagnostics | JSON + Markdown 全链路可观测 |
 
 第一阶段跑通以下链路：
 
