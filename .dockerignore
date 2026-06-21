@@ -1,0 +1,17 @@
+.git
+.gitignore
+__pycache__
+*.pyc
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.codegraph
+.venv
+venv
+.env
+outputs/*
+!outputs/demo/
+!outputs/demo/.gitkeep
+*.png
+*.jpg
+.playwright-mcp

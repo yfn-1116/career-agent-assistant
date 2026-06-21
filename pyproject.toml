@@ -4,17 +4,35 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "career-agent-assistant"
-version = "0.1.0"
-description = "RAG and LangGraph based career agent assistant MVP."
+version = "0.2.0"
+description = "Smart Apply Agent — RAG and LangGraph based career agent assistant."
 readme = "README.md"
 requires-python = ">=3.10"
+
+# --- Core dependencies (always needed) ---
 dependencies = [
   "langgraph>=1.0,<2.0",
+  "python-dotenv>=1.0",
+  "pyyaml>=6.0",
 ]
 
+# --- Optional dependency groups ---
 [project.optional-dependencies]
+# RAG: vector store & embedding backends
+rag = [
+  "sentence-transformers>=3.0",
+  "pymilvus>=2.4",
+]
+
+# Demo / UI
 demo = [
   "streamlit>=1.30",
+]
+
+# Development
+dev = [
+  "pytest>=8.0",
+  "pytest-timeout>=2.0",
 ]
 
 [tool.setuptools.packages.find]
