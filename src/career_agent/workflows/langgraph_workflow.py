@@ -1,28 +1,11 @@
-"""LangGraph-based job match workflow with conditional retry.
+"""LangGraph-based job match workflow — full Agentic RAG pipeline.
 
-Migrates the existing ``JobMatchWorkflow`` to a LangGraph ``StateGraph``
-while reusing all existing agent / service logic without rewriting it.
+Node order::
 
-Node order with conditional branching::
-
-    parse_jd -> rewrite_query -> retrieve_context -> grade_retrieval
-      ^                                                  │
-      │            (retry: score < threshold)            │
-      └──────────────────────────────────────────────────┤
-                                                         │
-                          (pass: score >= threshold)     │
-                                                         ▼
-                                                   analyze_match
-                                                         │
-                                                         ▼
-                                                   build_output
-                                                         │
-                                                         ▼
-                                                   write_report
-                                                         │
-    fallback (max retries)                                │
-      │                                                   │
-      └──► END ◄──────────────────────────────────────────┘
+    parse → rewrite → retrieve → rerank → grade ──(score≥0.65)──► analyze → build → faithfulness → write
+       ▲                        │          │
+       │     (retry: score<0.65)│          │(retry>=max)
+       └────────────────────────┘          └──► fallback ──► END
 """
 
 from __future__ import annotations
@@ -43,11 +26,17 @@ from career_agent.agents.state import (
     MatchAnalysisResult,
     ParsedJD,
 )
+from career_agent.domain.schemas import Evidence, GeneratedBullet
+from career_agent.evaluation.faithfulness import FaithfulnessChecker, FaithfulnessReport
+from career_agent.rag.embeddings.embedding_store import EmbeddingVectorStore
+from career_agent.rag.embeddings.qwen_embedding import QwenEmbeddingProvider
 from career_agent.rag.grading import GRADE_FAILED, RetrievalGradeReport, grade_retrieval
 from career_agent.rag.pipeline import RAGPipeline
+from career_agent.rag.reranker import LightweightReranker
+from career_agent.rag.retrievers.hybrid_retriever import HybridRetriever
 from career_agent.rag.schemas import RetrievedEvidence
+from career_agent.rag.vectorstores.memory_store import MemoryVectorStore
 
-# Default thresholds — overridable via settings
 DEFAULT_MIN_RETRIEVAL_SCORE = 0.65
 DEFAULT_MAX_RETRIES = 2
 
@@ -58,17 +47,17 @@ DEFAULT_MAX_RETRIES = 2
 
 
 class JobMatchState(TypedDict):
-    """LangGraph state for the job-match workflow."""
-
     raw_jd: str
     parsed_jd: ParsedJD | None
     queries: list[str]
     retrieved_chunks: list[RetrievedEvidence]
+    reranked_chunks: list[Any]
     retrieval_scores: RetrievalGradeReport | None
     missing_keywords: list[str]
     decision: str
     match_analysis: MatchAnalysisResult | None
     generated_result: GeneratedOutput | None
+    faithfulness_report: FaithfulnessReport | None
     report_path: str
     trace_id: str
     logs: list[str]
@@ -86,138 +75,163 @@ class JobMatchState(TypedDict):
 
 
 def _initial_state(
-    *,
-    raw_jd: str = "",
-    top_k: int = 5,
-    profile_dir: str = "",
-    output_dir: str = "",
-    max_retries: int = DEFAULT_MAX_RETRIES,
+    *, raw_jd="", top_k=5, profile_dir="", output_dir="", max_retries=DEFAULT_MAX_RETRIES,
 ) -> JobMatchState:
     return JobMatchState(
-        raw_jd=raw_jd,
-        parsed_jd=None,
-        queries=[],
-        retrieved_chunks=[],
-        retrieval_scores=None,
-        missing_keywords=[],
-        decision="continue",
-        match_analysis=None,
-        generated_result=None,
-        report_path="",
-        trace_id=uuid.uuid4().hex[:12],
-        logs=[],
-        retry_count=0,
-        max_retries=max_retries,
-        retry_history=[],
-        query_rewrite_reason="",
-        fallback_reason="",
-        next_action="parse_jd",
-        top_k=top_k,
-        profile_dir=profile_dir,
-        output_dir=output_dir,
-        status="running",
-        error_message="",
+        raw_jd=raw_jd, parsed_jd=None, queries=[], retrieved_chunks=[],
+        reranked_chunks=[], retrieval_scores=None, missing_keywords=[],
+        decision="continue", match_analysis=None, generated_result=None,
+        faithfulness_report=None, report_path="", trace_id=uuid.uuid4().hex[:12],
+        logs=[], retry_count=0, max_retries=max_retries, retry_history=[],
+        query_rewrite_reason="", fallback_reason="", next_action="parse_jd",
+        top_k=top_k, profile_dir=profile_dir, output_dir=output_dir,
+        status="running", error_message="",
     )
 
 
 # ---------------------------------------------------------------------------
-# Context passed through nodes via a simple carrier
+# Context
 # ---------------------------------------------------------------------------
 
-
 class _WorkflowContext:
-    """Shared resources created once and threaded through all nodes.
-
-    Not part of the serialisable state — we attach it to the compiled
-    graph at construction time and pass it via the *config* kwarg.
-    """
-
     def __init__(
         self,
-        jd_parser: JDParserAgent | None = None,
-        rag_pipeline: RAGPipeline | None = None,
-        match_agent: MatchAnalysisAgent | None = None,
-        build_agent: BuildAgent | None = None,
-    ) -> None:
+        jd_parser=None, rag_pipeline=None, match_agent=None, build_agent=None,
+        hybrid_retriever=None, reranker=None, faithfulness_checker=None,
+    ):
         self.jd_parser = jd_parser or JDParserAgent()
         self.rag_pipeline = rag_pipeline or RAGPipeline()
         self.rag_retriever = RAGRetrieveAgent(pipeline=self.rag_pipeline)
         self.match_agent = match_agent or MatchAnalysisAgent()
         self.build_agent = build_agent or BuildAgent()
+        self.hybrid_retriever = hybrid_retriever
+        self.reranker = reranker or LightweightReranker(top_k=5)
+        self.faithfulness_checker = faithfulness_checker or FaithfulnessChecker()
 
 
 # ---------------------------------------------------------------------------
 # Nodes
 # ---------------------------------------------------------------------------
 
-
-def parse_jd_node(state: JobMatchState, *, ctx: _WorkflowContext) -> dict[str, Any]:
+def parse_jd_node(state, *, ctx):
     _log(state, "parse_jd_node")
     parsed = ctx.jd_parser.parse(state["raw_jd"])
     state["logs"].append(f"parse_jd: title={parsed.job_title}, direction={parsed.job_direction}")
     return {"parsed_jd": parsed, "next_action": "rewrite_query"}
 
 
-def rewrite_query_node(state: JobMatchState, *, ctx: _WorkflowContext) -> dict[str, Any]:
+def rewrite_query_node(state, *, ctx):
     _log(state, "rewrite_query_node")
     pj = state["parsed_jd"]
     if pj is None:
-        state["logs"].append("rewrite_query: parsed_jd is None, skipping")
         return {"queries": [], "next_action": "retrieve_context", "retry_count": state.get("retry_count", 0)}
 
     retry_count = state.get("retry_count", 0)
     query = ctx.rag_retriever.build_query_from_parsed_jd(pj)
-
-    # If retrying, enhance query with missing keywords and rewrite reason
     missing = state.get("missing_keywords", [])
-    prev_queries = state.get("queries", [])
-    prev_scores = state.get("retrieval_scores")
 
     if retry_count > 0 and missing:
-        reason_parts = [f"retry #{retry_count}"]
-        # Focus on top missing keywords
-        focus_keywords = missing[:5]
-        reason_parts.append(f"missing: {', '.join(focus_keywords)}")
-        if prev_scores is not None:
-            reason_parts.append(f"prev_grade={prev_scores.grade}")
-
-        rewrite_reason = "; ".join(reason_parts)
-        # Build a more targeted query for the missing skills
-        alt_query = " ".join(focus_keywords)
-        query = f"{query} {' '.join(focus_keywords)}"
-
-        state["logs"].append(
-            f"rewrite_query: retry #{retry_count}, "
-            f"missing_keywords={focus_keywords}, "
-            f"new_query='{query[:120]}'"
-        )
+        query = f"{query} {' '.join(missing[:5])}"
+        reason = f"retry #{retry_count}; missing: {', '.join(missing[:5])}"
     else:
-        rewrite_reason = "initial query from parsed JD"
+        reason = "initial query from parsed JD"
 
+    state["logs"].append(f"rewrite_query: query='{query[:120]}'")
     return {
-        "queries": [query],
-        "retry_count": retry_count + 1,
-        "query_rewrite_reason": rewrite_reason,
-        "next_action": "retrieve_context",
+        "queries": [query], "retry_count": retry_count + 1,
+        "query_rewrite_reason": reason, "next_action": "retrieve_context",
     }
 
 
-def retrieve_context_node(state: JobMatchState, *, ctx: _WorkflowContext) -> dict[str, Any]:
+def retrieve_context_node(state, *, ctx):
     _log(state, "retrieve_context_node")
     queries = state.get("queries", [])
     if not queries or not queries[0]:
-        state["logs"].append("retrieve_context: no queries, returning empty")
-        return {"retrieved_chunks": [], "next_action": "grade_retrieval"}
+        return {"retrieved_chunks": [], "next_action": "rerank"}
 
-    query = queries[0]
+    query = queries[-1]
+    top_k = state["top_k"]
     if state["profile_dir"]:
         ctx.rag_pipeline.build_index(state["profile_dir"])
-    chunks = ctx.rag_pipeline.retrieve(query, top_k=state["top_k"])
-    state["logs"].append(f"retrieve_context: retrieved {len(chunks)} chunks")
-    return {"retrieved_chunks": chunks, "next_action": "grade_retrieval"}
+
+    # Use HybridRetriever if available, else fallback to pipeline
+    hr = ctx.hybrid_retriever
+    if hr is not None:
+        from career_agent.domain.schemas import ParsedJD as DomainParsedJD
+        pj = state.get("parsed_jd")
+        domain_pj = None
+        if pj is not None:
+            domain_pj = DomainParsedJD(
+                job_title=pj.job_title, job_direction=pj.job_direction,
+                hard_skills=list(pj.hard_skills), keywords=list(pj.keywords),
+            )
+        domain_chunks = hr.retrieve(query, top_k=top_k, parsed_jd=domain_pj)
+        # Convert domain RetrievedChunk → RetrievedEvidence for downstream compatibility
+        evidence_list = []
+        for dc in domain_chunks:
+            evidence_list.append(RetrievedEvidence(
+                evidence_id=f"hybrid-{dc.chunk_id}", chunk_id=dc.chunk_id,
+                title=dc.source.split("/")[-1] if dc.source else "",
+                content=dc.content, score=dc.final_hybrid_score,
+                source_path=dc.source,
+                matched_keywords=list(dc.matched_skills),
+                metadata={"keyword_score": dc.keyword_score, "vector_score": dc.vector_score,
+                          "metadata_score": dc.metadata_score, "final_hybrid_score": dc.final_hybrid_score},
+            ))
+        state["logs"].append(f"retrieve_context (hybrid): {len(evidence_list)} chunks")
+        return {"retrieved_chunks": evidence_list, "next_action": "rerank"}
+
+    chunks = ctx.rag_pipeline.retrieve(query, top_k=top_k)
+    state["logs"].append(f"retrieve_context: {len(chunks)} chunks")
+    return {"retrieved_chunks": chunks, "next_action": "rerank"}
 
 
-def grade_retrieval_node(state: JobMatchState, *, ctx: _WorkflowContext) -> dict[str, Any]:  # noqa: ARG001
+def rerank_node(state, *, ctx):
+    _log(state, "rerank_node")
+    chunks = state.get("retrieved_chunks", [])
+    if not chunks:
+        return {"reranked_chunks": [], "next_action": "grade_retrieval"}
+
+    # Convert to domain RetrievedChunk for reranker
+    from career_agent.domain.schemas import RetrievedChunk as DomainChunk
+    domain_chunks = []
+    for ev in chunks:
+        kw_score = ev.metadata.get("keyword_score", ev.score) if isinstance(ev.metadata, dict) else ev.score
+        vec_score = ev.metadata.get("vector_score", 0.0) if isinstance(ev.metadata, dict) else 0.0
+        domain_chunks.append(DomainChunk(
+            chunk_id=ev.chunk_id, source=ev.source_path, content=ev.content,
+            summary=ev.content[:120].replace("\n", " "),
+            keyword_score=kw_score, vector_score=vec_score,
+            final_hybrid_score=ev.score, matched_skills=list(ev.matched_keywords),
+        ))
+
+    pj = state.get("parsed_jd")
+    jd_skills = set()
+    if pj is not None:
+        for s in pj.hard_skills + pj.keywords:
+            if s.strip():
+                jd_skills.add(s.strip().lower())
+
+    reranked = ctx.reranker.rerank(domain_chunks, jd_skills=jd_skills if jd_skills else None)
+
+    # Convert back to RetrievedEvidence with rerank metadata
+    result = []
+    for dc in reranked:
+        result.append(RetrievedEvidence(
+            evidence_id=f"rerank-{dc.chunk_id}", chunk_id=dc.chunk_id,
+            title=dc.source.split("/")[-1] if dc.source else "",
+            content=dc.content, score=dc.rerank_score,
+            source_path=dc.source,
+            matched_keywords=list(dc.matched_skills),
+            metadata={"rerank_score": dc.rerank_score, "rerank_reason": dc.rerank_reason,
+                      "final_hybrid_score": dc.final_hybrid_score},
+        ))
+
+    state["logs"].append(f"rerank: {len(result)} chunks (from {len(chunks)})")
+    return {"reranked_chunks": result, "retrieved_chunks": result, "next_action": "grade_retrieval"}
+
+
+def grade_retrieval_node(state, *, ctx):  # noqa: ARG001
     _log(state, "grade_retrieval_node")
     queries = state.get("queries", [])
     query = queries[-1] if queries else ""
@@ -225,147 +239,95 @@ def grade_retrieval_node(state: JobMatchState, *, ctx: _WorkflowContext) -> dict
     top_k = state["top_k"]
     retry_count = state.get("retry_count", 0)
 
-    report = grade_retrieval(
-        query=query,
-        parsed_jd=state["parsed_jd"],
-        evidence=chunks,
-        top_k=top_k,
-    )
-
+    report = grade_retrieval(query=query, parsed_jd=state["parsed_jd"], evidence=chunks, top_k=top_k)
     missing = _collect_missing_keywords(report, state["parsed_jd"])
     total_score = report.metadata.get("total_score", 0)
     decision = _decide_from_grade(report, total_score, retry_count, state.get("max_retries", DEFAULT_MAX_RETRIES))
 
-    # Record retry history
-    history_entry = {
-        "round": retry_count if retry_count > 0 else 1,
-        "query": query,
-        "top_k": top_k,
-        "evidence_count": report.evidence_count,
-        "total_score": total_score,
-        "grade": report.grade,
-        "decision": decision,
-        "missing_keywords": list(missing),
-    }
     history = list(state.get("retry_history", []))
-    history.append(history_entry)
+    history.append({"round": retry_count if retry_count > 0 else 1, "query": query,
+                    "top_k": top_k, "evidence_count": report.evidence_count,
+                    "total_score": total_score, "grade": report.grade,
+                    "decision": decision, "missing_keywords": list(missing)})
 
-    state["logs"].append(
-        f"grade_retrieval: round={history_entry['round']}, "
-        f"grade={report.grade}, "
-        f"score={total_score:.2f}, "
-        f"coverage={report.keyword_coverage:.2f}, "
-        f"decision={decision}"
-    )
-
-    return {
-        "retrieval_scores": report,
-        "missing_keywords": missing,
-        "decision": decision,
-        "retry_history": history,
-        "next_action": decision,
-    }
+    state["logs"].append(f"grade_retrieval: round={history[-1]['round']}, grade={report.grade}, "
+                         f"score={total_score:.2f}, decision={decision}")
+    return {"retrieval_scores": report, "missing_keywords": missing,
+            "decision": decision, "retry_history": history, "next_action": decision}
 
 
-def analyze_match_node(state: JobMatchState, *, ctx: _WorkflowContext) -> dict[str, Any]:
+def analyze_match_node(state, *, ctx):
     _log(state, "analyze_match_node")
-    pj = state["parsed_jd"]
-    chunks = state.get("retrieved_chunks", [])
+    pj, chunks = state["parsed_jd"], state.get("retrieved_chunks", [])
     if pj is None:
-        state["logs"].append("analyze_match: parsed_jd is None, skipping")
         return {"match_analysis": None, "next_action": "build_output"}
     result = ctx.match_agent.analyze(pj, chunks)
-    state["logs"].append(
-        f"analyze_match: strengths={len(result.strengths)}, "
-        f"weaknesses={len(result.weaknesses)}"
-    )
     return {"match_analysis": result, "next_action": "build_output"}
 
 
-def build_output_node(state: JobMatchState, *, ctx: _WorkflowContext) -> dict[str, Any]:
+def build_output_node(state, *, ctx):
     _log(state, "build_output_node")
     pj = state["parsed_jd"] or ParsedJD()
     chunks = state.get("retrieved_chunks", [])
     analysis = state.get("match_analysis") or MatchAnalysisResult()
     result = ctx.build_agent.build(pj, chunks, analysis)
-    state["logs"].append(
-        f"build_output: bullets={len(result.resume_bullets)}, "
-        f"refs={len(result.evidence_refs)}"
-    )
-    return {"generated_result": result, "next_action": "write_report"}
+    return {"generated_result": result, "next_action": "check_faithfulness"}
 
 
-def write_report_node(state: JobMatchState, *, ctx: _WorkflowContext) -> dict[str, Any]:  # noqa: ARG001
+def check_faithfulness_node(state, *, ctx):
+    _log(state, "check_faithfulness_node")
+    gr = state.get("generated_result")
+    if gr is None:
+        return {"faithfulness_report": None, "next_action": "write_report"}
+
+    bullets = [GeneratedBullet(text=b, evidence_ids=list(gr.evidence_refs),
+                source_paths=[state.get("report_path", "")], confidence=0.8)
+               for b in gr.resume_bullets]
+    evidences = [Evidence(evidence_id=ref, chunk_id=ref, source="", content="")
+                 for ref in gr.evidence_refs]
+
+    report = ctx.faithfulness_checker.check(bullets, evidences)
+    state["logs"].append(f"faithfulness: score={report.faithfulness_score:.2f}, decision={report.decision}")
+    return {"faithfulness_report": report, "next_action": "write_report"}
+
+
+def write_report_node(state, *, ctx):  # noqa: ARG001
     _log(state, "write_report_node")
     output_dir = Path(state["output_dir"]) if state["output_dir"] else Path("outputs/demo")
     output_dir.mkdir(parents=True, exist_ok=True)
     report_path = output_dir / f"langgraph_result_{state['trace_id']}.md"
-    # Set status before rendering so the report shows "completed"
     state["status"] = "completed"
     state["next_action"] = "end"
     report_path.write_text(_render_langgraph_report(state), encoding="utf-8")
-    state["logs"].append(f"write_report: {report_path}")
-    return {
-        "report_path": str(report_path),
-        "status": "completed",
-        "next_action": "end",
-    }
+
+    # Also write diagnostics JSON
+    from career_agent.evaluation.diagnostics import write_diagnostics
+    diag_path = write_diagnostics(dict(state), output_dir=str(output_dir.parent / "diagnostics"))
+    state["logs"].append(f"write_report: {report_path}, diagnostics: {diag_path}")
+
+    return {"report_path": str(report_path), "status": "completed", "next_action": "end"}
 
 
 # ---------------------------------------------------------------------------
-# Helpers
+# Routing & fallback
 # ---------------------------------------------------------------------------
 
-
-def _log(state: JobMatchState, node: str) -> None:
-    state.setdefault("logs", []).append(f"[{datetime.now(timezone.utc).isoformat()}] {node}")
-
-
-def _collect_missing_keywords(
-    report: RetrievalGradeReport, parsed_jd: ParsedJD | None
-) -> list[str]:
-    if parsed_jd is None:
-        return []
-    all_matched: set[str] = set()
-    for ev_summary in report.evidence_summaries:
-        for kw in ev_summary.get("matched_keywords", []):
-            all_matched.add(kw.lower())
-    expected = set(
-        kw.lower()
-        for kw in (parsed_jd.hard_skills + parsed_jd.bonus_skills + parsed_jd.keywords)
-    )
-    return sorted(expected - all_matched)
-
-
-def _decide_from_grade(
-    report: RetrievalGradeReport,
-    total_score: float = 0.0,
-    retry_count: int = 0,
-    max_retries: int = DEFAULT_MAX_RETRIES,
-) -> str:
+def _decide_from_grade(report, total_score=0.0, retry_count=0, max_retries=DEFAULT_MAX_RETRIES):
     if retry_count >= max_retries:
         return "fallback"
     if total_score >= DEFAULT_MIN_RETRIEVAL_SCORE:
         return "continue"
-    if report.grade == GRADE_FAILED:
-        return "retry"
-    if report.grade == "weak":
+    if report.grade in (GRADE_FAILED, "weak"):
         return "retry"
     return "continue"
 
 
-def _route_after_grading(
-    state: JobMatchState,
-    min_score: float = DEFAULT_MIN_RETRIEVAL_SCORE,
-    max_retries: int = DEFAULT_MAX_RETRIES,
-) -> str:
-    """Conditional edge: decide next node after grading."""
+def _route_after_grading(state, min_score=DEFAULT_MIN_RETRIEVAL_SCORE, max_retries=DEFAULT_MAX_RETRIES):
     decision = state.get("decision", "continue")
     if decision == "fallback":
         return "fallback"
     if decision == "retry":
         return "rewrite_query"
-    # Check score threshold for explicit continue
     rs = state.get("retrieval_scores")
     if rs is not None:
         total = rs.metadata.get("total_score", 0)
@@ -377,197 +339,147 @@ def _route_after_grading(
     return "analyze_match"
 
 
-def fallback_node(state: JobMatchState, *, ctx: _WorkflowContext) -> dict[str, Any]:  # noqa: ARG001
-    """Handle exhausted retries — produce a safe report without fabrication."""
+def fallback_node(state, *, ctx):  # noqa: ARG001
     _log(state, "fallback_node")
     missing = state.get("missing_keywords", [])
-    history = state.get("retry_history", [])
-
-    reason = (
-        f"经过 {state.get('retry_count', 0)} 轮检索（最多 {state.get('max_retries', DEFAULT_MAX_RETRIES)} 轮），"
-        f"检索质量未达到阈值 {DEFAULT_MIN_RETRIEVAL_SCORE}。"
-    )
+    reason = (f"经过 {state.get('retry_count', 0)} 轮检索（最多 {state.get('max_retries', DEFAULT_MAX_RETRIES)} 轮），"
+              f"检索质量未达到阈值 {DEFAULT_MIN_RETRIEVAL_SCORE}。")
     if missing:
         reason += f" 未覆盖技能：{', '.join(missing[:10])}。"
 
-    state["logs"].append(
-        f"fallback: retries={state.get('retry_count', 0)}, "
-        f"missing={len(missing)} keywords, reason={reason[:120]}"
-    )
-
-    # Write a fallback report
     output_dir = Path(state["output_dir"]) if state["output_dir"] else Path("outputs/demo")
     output_dir.mkdir(parents=True, exist_ok=True)
     report_path = output_dir / f"langgraph_fallback_{state['trace_id']}.md"
-    report_lines = [
-        "# LangGraph — 检索未达标（Fallback）",
-        "",
-        f"- Trace ID: `{state['trace_id']}`",
-        f"- Reason: {reason}",
-        f"- Retry History: {len(history)} rounds",
-        "",
-        "## 建议",
-        "当前用户资料库可能不足以覆盖该岗位的核心技能要求。",
-        "建议补充以下材料：",
-        "",
-    ]
+    lines = ["# LangGraph — 检索未达标（Fallback）", "",
+             f"- Trace ID: `{state['trace_id']}`", f"- Reason: {reason}", "",
+             "## 建议", "当前用户资料库可能不足以覆盖该岗位的核心技能要求。",
+             "建议补充以下材料：", ""]
     for kw in missing[:10]:
-        report_lines.append(f"- {kw} 相关项目经历或技能说明")
-    report_lines.append("")
-    report_lines.append("补充资料后重新运行即可获得更准确的匹配分析。")
-    report_path.write_text("\n".join(report_lines), encoding="utf-8")
+        lines.append(f"- {kw} 相关项目经历或技能说明")
+    lines.append(""); lines.append("补充资料后重新运行即可获得更准确的匹配分析。")
+    report_path.write_text("\n".join(lines), encoding="utf-8")
 
-    return {
-        "decision": "fallback",
-        "fallback_reason": reason,
-        "report_path": str(report_path),
-        "status": "completed",
-        "next_action": "end",
-    }
+    return {"decision": "fallback", "fallback_reason": reason,
+            "report_path": str(report_path), "status": "completed", "next_action": "end"}
 
 
-def _render_langgraph_report(state: JobMatchState) -> str:
-    lines: list[str] = []
-    L = lines.append  # noqa: E741
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
-    L("# LangGraph Job Match Workflow 结果")
+def _log(state, node):
+    state.setdefault("logs", []).append(f"[{datetime.now(timezone.utc).isoformat()}] {node}")
+
+
+def _collect_missing_keywords(report, parsed_jd):
+    if parsed_jd is None:
+        return []
+    all_matched = set()
+    for ev_summary in report.evidence_summaries:
+        for kw in ev_summary.get("matched_keywords", []):
+            all_matched.add(kw.lower())
+    expected = set(kw.lower() for kw in (parsed_jd.hard_skills + parsed_jd.bonus_skills + parsed_jd.keywords))
+    return sorted(expected - all_matched)
+
+
+# ---------------------------------------------------------------------------
+# Report
+# ---------------------------------------------------------------------------
+
+def _render_langgraph_report(state):
+    L = [].append
+    lines = []
+
+    def L(text): lines.append(text)  # noqa: E741
+
+    L("# LangGraph Agentic RAG — 完整诊断报告")
     L("")
-    L(f"- Trace ID: `{state['trace_id']}`")
-    L(f"- Status: {state['status']}")
-    L(f"- Decision: {state['decision']}")
-    L(f"- Retry Count: {state['retry_count']}")
-    L(f"- Next Action: {state['next_action']}")
+    L(f"- Trace: `{state['trace_id']}` | Status: {state['status']} | Decision: {state['decision']} | Retry: {state['retry_count']}")
     L("")
 
-    # --- Parsed JD ---
     pj = state["parsed_jd"]
-    L("## 1. Parsed JD")
+    L("## 1. JD 解析")
     if pj is not None:
-        L(f"- 岗位标题：{pj.job_title or '（未识别）'}")
-        L(f"- 岗位方向：{pj.job_direction}")
-        L(f"- 硬技能：{', '.join(pj.hard_skills) if pj.hard_skills else '（无）'}")
-        L(f"- 加分技能：{', '.join(pj.bonus_skills) if pj.bonus_skills else '（无）'}")
-        L(f"- 关键词：{', '.join(pj.keywords) if pj.keywords else '（无）'}")
-    else:
-        L("（无结果）")
+        L(f"- 标题: {pj.job_title}, 方向: {pj.job_direction}")
+        L(f"- 硬技能: {', '.join(pj.hard_skills[:10]) if pj.hard_skills else '无'}")
     L("")
 
-    # --- Rewritten Queries ---
-    L("## 2. Rewritten Queries")
-    for i, q in enumerate(state.get("queries", []), 1):
-        L(f"- [{i}] `{q}`")
-    if not state.get("queries"):
-        L("（无）")
-    L("")
-
-    # --- Retrieved Chunks ---
-    L("## 3. Retrieved Chunks")
-    L(f"共 {len(state.get('retrieved_chunks', []))} 条：")
-    for i, ev in enumerate(state.get("retrieved_chunks", []), 1):
-        L(f"- [{i}] {ev.title or ev.evidence_id} `score={ev.score:.2f}` `source={ev.source_path}`")
-    L("")
-
-    # --- Retrieval Scores ---
-    L("## 4. Retrieval Scores")
-    rs = state.get("retrieval_scores")
-    if rs is not None:
-        L(f"- Grade: **{rs.grade}** (total_score={rs.metadata.get('total_score', rs.average_score):.2f})")
-        L(f"- Evidence Count: {rs.evidence_count}/{rs.top_k}")
-        L(f"- Average Score: {rs.average_score:.2f}")
-        L(f"- Keyword Coverage: {rs.keyword_coverage:.2f}")
-        L(f"- Source Diversity: {rs.source_diversity}")
-        for item in rs.items:
-            L(f"  - {item.name}: {'✅' if item.passed else '❌'} {item.message}")
-    else:
-        L("（无）")
-    L("")
-
-    # --- Missing Keywords ---
-    L("## 5. Missing Keywords")
-    mk = state.get("missing_keywords", [])
-    if mk:
-        L(", ".join(mk))
-    else:
-        L("（全部覆盖）")
-    L("")
-
-    # --- Decision ---
-    L("## 6. Decision")
-    L(f"**{state.get('decision', 'N/A')}**")
-    L("")
-
-    # --- Retry History ---
+    L("## 2. Query Rewrite History")
     rh = state.get("retry_history", [])
     if rh:
-        L("## 7. Retry History")
-        L("")
-        L("| Round | Query | Top-K | Evidence | Score | Grade | Decision |")
-        L("|-------|-------|-------|----------|-------|-------|----------|")
-        for entry in rh:
-            L(
-                f"| {entry.get('round', '?')} "
-                f"| `{str(entry.get('query', ''))[:60]}` "
-                f"| {entry.get('top_k', '?')} "
-                f"| {entry.get('evidence_count', '?')} "
-                f"| {entry.get('total_score', 0):.2f} "
-                f"| {entry.get('grade', '?')} "
-                f"| {entry.get('decision', '?')} |"
-            )
-        L("")
+        L("| Round | Query | Score | Grade | Decision |")
+        L("|-------|-------|-------|-------|----------|")
+        for e in rh:
+            L(f"| {e['round']} | `{str(e.get('query',''))[:60]}` | {e.get('total_score',0):.2f} | {e.get('grade','')} | {e.get('decision','')} |")
+    L("")
 
-    # --- Fallback reason ---
+    L("## 3. Hybrid Retrieval")
+    chunks = state.get("retrieved_chunks", [])
+    L(f"共 {len(chunks)} 条:")
+    for i, ev in enumerate(chunks, 1):
+        meta = ev.metadata if isinstance(ev.metadata, dict) else {}
+        kw = meta.get("keyword_score", "-")
+        vec = meta.get("vector_score", "-")
+        hyb = meta.get("final_hybrid_score", ev.score)
+        L(f"  {i}. `{ev.source_path.split('/')[-1] if ev.source_path else '?'}` "
+          f"kw={kw} vec={vec} hybrid={hyb:.2f} rerank={meta.get('rerank_score', '-')}")
+    L("")
+
+    L("## 4. Reranker")
+    for i, ev in enumerate(chunks, 1):
+        meta = ev.metadata if isinstance(ev.metadata, dict) else {}
+        reason = meta.get("rerank_reason", "")
+        if reason:
+            L(f"  {i}. {reason}")
+    if not any((ev.metadata or {}).get("rerank_reason") if isinstance(ev.metadata, dict) else False for ev in chunks):
+        L("  (无 rerank 数据)")
+    L("")
+
+    L("## 5. Retrieval Grading")
+    rs = state.get("retrieval_scores")
+    if rs is not None:
+        L(f"- Grade: **{rs.grade}** (total={rs.metadata.get('total_score', 0):.2f})")
+        L(f"- Evidence: {rs.evidence_count}/{rs.top_k}, Coverage: {rs.keyword_coverage:.2f}, Diversity: {rs.source_diversity}")
+        for item in rs.items:
+            L(f"  - {'✅' if item.passed else '❌'} {item.name}: {item.message}")
+    L("")
+
+    L("## 6. Missing Keywords")
+    mk = state.get("missing_keywords", [])
+    L(", ".join(mk[:15]) if mk else "（全部覆盖）")
+    L("")
+
     fr = state.get("fallback_reason", "")
     if fr:
-        L("## 8. Fallback Reason")
-        L(fr)
+        L(f"## 7. Fallback: {fr}")
         L("")
 
-    # --- Match Analysis ---
-    section_offset = 8 if fr else (7 if rh else 6)
-    section_offset += 1
+    L("## 8. Match Analysis")
     ma = state.get("match_analysis")
-    L(f"## {section_offset}. Match Analysis")
-    section_offset += 1
     if ma is not None:
-        L("### Strengths")
-        for s in ma.strengths:
-            L(f"- {s}")
-        L("### Weaknesses")
-        for w in ma.weaknesses:
-            L(f"- {w}")
-        L("### Suggestions")
-        for s in ma.suggestions:
-            L(f"- {s}")
-    else:
-        L("（无）")
+        for s in ma.strengths[:5]:
+            L(f"- ✅ {s}")
+        for w in ma.weaknesses[:5]:
+            L(f"- ⚠️ {w}")
     L("")
 
-    # --- Generated Result ---
+    L("## 9. Generated Output")
     gr = state.get("generated_result")
-    L(f"## {section_offset}. Generated Result")
-    section_offset += 1
     if gr is not None:
-        L("### Resume Bullets")
-        for b in gr.resume_bullets:
+        for b in gr.resume_bullets[:5]:
             L(f"- {b}")
-        L("### Communication")
-        L(gr.communication_message)
-        L("### Summary")
-        L(gr.summary)
-    else:
-        L("（无）")
+        L(f"\n> {gr.communication_message}")
     L("")
 
-    # --- Logs ---
-    L(f"## {section_offset}. Execution Logs")
-    section_offset += 1
-    for log_entry in state.get("logs", []):
-        L(f"- {log_entry}")
+    L("## 10. Faithfulness Check")
+    frp = state.get("faithfulness_report")
+    if frp is not None:
+        L(f"- Score: {frp.faithfulness_score:.2f}, Decision: {frp.decision}")
+        if frp.unsupported_claims:
+            L(f"- Unsupported claims: {len(frp.unsupported_claims)}")
     L("")
 
-    L(f"## {section_offset}. Report Path")
-    L(f"`{state.get('report_path', '')}`")
-
+    L(f"## 11. Report: `{state.get('report_path', '')}`")
     return "\n".join(lines)
 
 
@@ -575,95 +487,86 @@ def _render_langgraph_report(state: JobMatchState) -> str:
 # Graph builder
 # ---------------------------------------------------------------------------
 
-
 def create_langgraph_workflow(
-    jd_parser: JDParserAgent | None = None,
-    rag_pipeline: RAGPipeline | None = None,
-    match_agent: MatchAnalysisAgent | None = None,
-    build_agent: BuildAgent | None = None,
-    profile_dir: str | Path = "",
-) -> Any:
-    """Build and compile a LangGraph ``StateGraph`` for the job-match flow.
-
-    Returns a compiled graph ready for ``.invoke(initial_state)``.
-    """
+    jd_parser=None, rag_pipeline=None, match_agent=None, build_agent=None,
+    profile_dir="", hybrid_retriever=None, reranker=None, faithfulness_checker=None,
+):
     ctx = _WorkflowContext(
-        jd_parser=jd_parser,
-        rag_pipeline=rag_pipeline,
-        match_agent=match_agent,
-        build_agent=build_agent,
+        jd_parser=jd_parser, rag_pipeline=rag_pipeline,
+        match_agent=match_agent, build_agent=build_agent,
+        hybrid_retriever=hybrid_retriever, reranker=reranker,
+        faithfulness_checker=faithfulness_checker,
     )
     if profile_dir:
         ctx.rag_pipeline.build_index(profile_dir)
+        # Also build hybrid retriever index if available
+        if ctx.hybrid_retriever is not None:
+            # Build keyword store index too
+            pass  # HybridRetriever delegates to its own retrievers
 
     graph = StateGraph(JobMatchState)
 
-    # Register nodes — lambda wraps to inject *ctx*
-    graph.add_node("parse_jd", lambda s: parse_jd_node(s, ctx=ctx))
-    graph.add_node("rewrite_query", lambda s: rewrite_query_node(s, ctx=ctx))
-    graph.add_node("retrieve_context", lambda s: retrieve_context_node(s, ctx=ctx))
-    graph.add_node("grade_retrieval", lambda s: grade_retrieval_node(s, ctx=ctx))
-    graph.add_node("analyze_match", lambda s: analyze_match_node(s, ctx=ctx))
-    graph.add_node("build_output", lambda s: build_output_node(s, ctx=ctx))
-    graph.add_node("write_report", lambda s: write_report_node(s, ctx=ctx))
-    graph.add_node("fallback", lambda s: fallback_node(s, ctx=ctx))
+    for name, fn in [
+        ("parse_jd", parse_jd_node), ("rewrite_query", rewrite_query_node),
+        ("retrieve_context", retrieve_context_node), ("rerank", rerank_node),
+        ("grade_retrieval", grade_retrieval_node), ("analyze_match", analyze_match_node),
+        ("build_output", build_output_node), ("check_faithfulness", check_faithfulness_node),
+        ("write_report", write_report_node), ("fallback", fallback_node),
+    ]:
+        graph.add_node(name, lambda s, f=fn: f(s, ctx=ctx))
 
-    # Linear edges for initial flow
     graph.add_edge(START, "parse_jd")
     graph.add_edge("parse_jd", "rewrite_query")
     graph.add_edge("rewrite_query", "retrieve_context")
-    graph.add_edge("retrieve_context", "grade_retrieval")
+    graph.add_edge("retrieve_context", "rerank")
+    graph.add_edge("rerank", "grade_retrieval")
 
-    # Conditional edge: grade → analyze OR retry → rewrite_query OR fallback
     graph.add_conditional_edges(
         "grade_retrieval",
-        lambda s: _route_after_grading(
-            s,
-            min_score=DEFAULT_MIN_RETRIEVAL_SCORE,
-            max_retries=DEFAULT_MAX_RETRIES,
-        ),
-        {
-            "analyze_match": "analyze_match",
-            "rewrite_query": "rewrite_query",
-            "fallback": "fallback",
-        },
+        lambda s: _route_after_grading(s, DEFAULT_MIN_RETRIEVAL_SCORE, DEFAULT_MAX_RETRIES),
+        {"analyze_match": "analyze_match", "rewrite_query": "rewrite_query", "fallback": "fallback"},
     )
 
-    # analyze → build → write → END
     graph.add_edge("analyze_match", "build_output")
-    graph.add_edge("build_output", "write_report")
+    graph.add_edge("build_output", "check_faithfulness")
+    graph.add_edge("check_faithfulness", "write_report")
     graph.add_edge("write_report", END)
-
-    # fallback → END (no generation)
     graph.add_edge("fallback", END)
 
     return graph.compile()
 
 
-# Convenience runner
 def run_langgraph_workflow(
-    raw_jd: str,
-    *,
-    top_k: int = 5,
-    profile_dir: str | Path = "",
-    output_dir: str | Path = "outputs/demo",
-    jd_parser: JDParserAgent | None = None,
-    rag_pipeline: RAGPipeline | None = None,
-    match_agent: MatchAnalysisAgent | None = None,
-    build_agent: BuildAgent | None = None,
-) -> JobMatchState:
-    """Run the full LangGraph workflow and return the final state."""
+    raw_jd="", *, top_k=5, profile_dir="", output_dir="outputs/demo",
+    jd_parser=None, rag_pipeline=None, match_agent=None, build_agent=None,
+):
+    import os as _os
+
+    # Auto-build HybridRetriever if Qwen key available
+    hr = None
+    if _os.getenv("QWEN_API_KEY"):
+        try:
+            kw_store = MemoryVectorStore()
+            emb_provider = QwenEmbeddingProvider()
+            emb_store = EmbeddingVectorStore(emb_provider)
+            hr = HybridRetriever(keyword_retriever=kw_store.search, embedding_retriever=emb_store.search)
+            # Pre-index into keyword store
+            if profile_dir:
+                from career_agent.rag.loaders.markdown_loader import MarkdownProfileLoader
+                from career_agent.rag.chunking.text_chunker import TextChunker
+                loader, chunker = MarkdownProfileLoader(), TextChunker()
+                docs = loader.load_directory(profile_dir)
+                chunks = chunker.chunk_documents(docs)
+                kw_store.add_chunks(chunks)
+                emb_store.add_chunks(chunks)
+        except Exception:
+            hr = None
+
     app = create_langgraph_workflow(
-        jd_parser=jd_parser,
-        rag_pipeline=rag_pipeline,
-        match_agent=match_agent,
-        build_agent=build_agent,
-        profile_dir=profile_dir,
+        jd_parser=jd_parser, rag_pipeline=rag_pipeline,
+        match_agent=match_agent, build_agent=build_agent,
+        profile_dir=profile_dir, hybrid_retriever=hr,
     )
-    initial = _initial_state(
-        raw_jd=raw_jd,
-        top_k=top_k,
-        profile_dir=str(profile_dir),
-        output_dir=str(output_dir),
-    )
+    initial = _initial_state(raw_jd=raw_jd, top_k=top_k,
+                             profile_dir=str(profile_dir), output_dir=str(output_dir))
     return app.invoke(initial)

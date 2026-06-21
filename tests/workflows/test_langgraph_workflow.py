@@ -82,14 +82,14 @@ def test_workflow_writes_report():
         content = report_path.read_text(encoding="utf-8")
 
         # Report must contain the key diagnostic sections
-        assert "Parsed JD" in content
-        assert "Rewritten Queries" in content
-        assert "Retrieved Chunks" in content
-        assert "Retrieval Scores" in content
+        assert "JD 解析" in content
+        assert "Query Rewrite History" in content
+        assert "Hybrid Retrieval" in content
+        assert "Retrieval Grading" in content
         assert "Missing Keywords" in content
-        assert "Decision" in content
         assert "Match Analysis" in content
-        assert "Generated Result" in content
+        assert "Generated Output" in content
+        assert "Faithfulness Check" in content
         assert state["trace_id"] in content
 
 
@@ -167,7 +167,7 @@ def test_write_report_node_creates_file():
         assert path.is_file()
         assert path.suffix == ".md"
         content = path.read_text(encoding="utf-8")
-        assert "LangGraph Job Match Workflow" in content
+        assert "LangGraph Agentic RAG" in content
 
 
 # ---------------------------------------------------------------------------
@@ -290,6 +290,6 @@ def test_report_contains_retry_history():
         ctx = _WorkflowContext()
         updates = write_report_node(state, ctx=ctx)
         content = Path(updates["report_path"]).read_text(encoding="utf-8")
-        assert "Retry History" in content
+        assert "Query Rewrite History" in content
         assert "query1" in content
         assert "0.45" in content
