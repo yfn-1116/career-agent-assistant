@@ -47,7 +47,14 @@ for msg in st.session_state.messages:
         st.markdown(msg["content"])
 
 # ---- 输入框 ----
-if prompt := st.chat_input("粘贴 JD 或输入问题..."):
+col1, col2 = st.columns([5, 1])
+with col1:
+    prompt = st.text_area("输入", placeholder="粘贴 JD 或输入问题...", label_visibility="collapsed", height=80, key="chat_input")
+with col2:
+    st.write(""); st.write("")
+    send = st.button("发送", use_container_width=True, type="primary")
+
+if send and prompt.strip():
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
