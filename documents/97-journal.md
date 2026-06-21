@@ -2,6 +2,27 @@
 
 ## 2026-06-21
 
+### PACKAGING-001 pyproject 与依赖规范化
+
+- Executor: Codex
+- Type: packaging / docs
+- Summary:
+  - 新增 pyproject.toml，声明 src layout、pytest pythonpath/testpaths 和 langgraph 依赖。
+  - 将 README 与本地/服务器 runbook 的主命令切换为 editable install、pytest tests -q、CLI demo 和可选 demo extra。
+- Changed files:
+  - pyproject.toml
+  - README.md
+  - documents/98-runbook/01-local-development.md
+  - documents/98-runbook/03-school-server-deploy.md
+  - documents/97-journal.md
+  - documents/99-project-planning.md
+- Validation:
+  - python -m pip install -e .
+  - pytest tests -q
+  - python demo/cli/run_job_match_demo.py
+- Next:
+  - 继续按任务卡推进 WORKFLOW-002 / DEMO-003。
+
 ### RAG-006 布尔检索评分覆盖补充
 
 - Executor: Codex

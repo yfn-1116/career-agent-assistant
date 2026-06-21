@@ -48,21 +48,24 @@
 git clone https://github.com/yfn-1116/career-agent-assistant.git
 cd career-agent-assistant
 
+# 安装项目依赖
+python -m pip install -e .
+
 # 运行全部测试
-PYTHONPATH=src pytest tests/rag tests/agents tests/workflows tests/demo -v
+pytest tests -q
 
 # 运行 CLI demo（默认稳定展示方式）
-PYTHONPATH=src python demo/cli/run_job_match_demo.py
+python demo/cli/run_job_match_demo.py
 
 # 查看输出
 cat outputs/demo/job_match_result.md
 
 # 可选：Streamlit 可视化展示
-pip install streamlit
-PYTHONPATH=src streamlit run demo/streamlit/app.py
+python -m pip install -e ".[demo]"
+streamlit run demo/streamlit/app.py
 
 # 运行评估 runner（检查输出质量）
-PYTHONPATH=src python demo/evaluation/run_evaluation.py
+python demo/evaluation/run_evaluation.py
 cat outputs/demo/evaluation_report.md
 
 # 可选：启用 LLM 增强（需要 DeepSeek API Key）

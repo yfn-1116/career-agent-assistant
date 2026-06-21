@@ -13,9 +13,9 @@
 |---|---|---|
 | Python | 3.10+ | 过低版本可能语法不兼容 |
 | Git | 任意 | 用于 clone 和 pull |
-| pip | 任意 | 安装 pytest / streamlit |
-| pytest | 最新 | `pip install pytest` |
-| streamlit | 最新（可选） | `pip install streamlit` |
+| pip | 任意 | 安装项目与可选 demo 依赖 |
+| pytest | 最新 | 用于运行测试 |
+| streamlit | 1.30+（可选） | 通过 `python -m pip install -e ".[demo]"` 安装 |
 
 **不依赖**：GPU、外部大模型 API、数据库、Redis、Docker。
 
@@ -30,18 +30,18 @@ cd career-agent-assistant
 python3 -m venv .venv
 source .venv/bin/activate
 
-# 3. 安装测试依赖
-pip install pytest
+# 3. 安装项目依赖
+python -m pip install -e .
 
 # 4. 运行全部测试确认环境正常
-PYTHONPATH=src pytest tests/rag tests/agents tests/workflows tests/demo -v
+pytest tests -q
 # 预期约 165 个测试全部通过
 ```
 
 ## 4. 运行 CLI demo（默认展示方式）
 
 ```bash
-PYTHONPATH=src python demo/cli/run_job_match_demo.py
+python demo/cli/run_job_match_demo.py
 ```
 
 终端输出：
@@ -65,13 +65,13 @@ cat outputs/demo/job_match_result.md
 ### 安装
 
 ```bash
-pip install streamlit
+python -m pip install -e ".[demo]"
 ```
 
 ### 启动
 
 ```bash
-PYTHONPATH=src streamlit run demo/streamlit/app.py --server.address 0.0.0.0 --server.port 8501
+streamlit run demo/streamlit/app.py --server.address 0.0.0.0 --server.port 8501
 ```
 
 启动后终端会显示访问地址（如 `http://<服务器IP>:8501`）。
@@ -97,10 +97,11 @@ PYTHONPATH=src streamlit run demo/streamlit/app.py --server.address 0.0.0.0 --se
 cd career-agent-assistant
 git pull
 source .venv/bin/activate  # 如果使用虚拟环境
-PYTHONPATH=src pytest tests/rag tests/agents tests/workflows tests/demo -v
+python -m pip install -e .
+pytest tests -q
 
 # 确认测试通过后运行 demo
-PYTHONPATH=src python demo/cli/run_job_match_demo.py
+python demo/cli/run_job_match_demo.py
 ```
 
 ## 7. 展示给老师或同学
@@ -119,7 +120,7 @@ PYTHONPATH=src python demo/cli/run_job_match_demo.py
 
 1. `cat data/samples/profile/resume.md` — 展示样例用户资料
 2. `cat data/samples/jobs/agent_intern_jd.md` — 展示样例 JD
-3. `PYTHONPATH=src python demo/cli/run_job_match_demo.py` — 运行
+3. `python demo/cli/run_job_match_demo.py` — 运行
 4. `cat outputs/demo/job_match_result.md` — 逐段讲解输出
 
 **方案 B：Streamlit demo（可视化）**
