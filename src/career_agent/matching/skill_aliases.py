@@ -3,7 +3,7 @@
 SKILL_ALIASES: dict[str, list[str]] = {
     "agent": ["ai agent", "智能体", "agentic workflow", "多 agent", "agent 应用", "agent开发"],
     "rag": ["知识库", "向量检索", "检索增强生成", "retrieval augmented generation", "文档问答", "rag系统"],
-    "langgraph": ["stategraph", "workflow", "状态图", "条件分支", "graph orchestration", "langgraph workflow"],
+    "langgraph": ["stategraph", "workflow", "状态图", "条件分支", "graph orchestration", "langgraph workflow", "langgraph", "agent workflow", "工作流", "编排"],
     "tool calling": ["工具调用", "tool registry", "function calling", "mcp", "外部工具", "tool use"],
     "llm": ["大模型", "llm app", "大模型应用", "llm application", "language model", "qwen", "deepseek", "openai"],
     "prompt engineering": ["prompt", "提示词", "提示工程", "prompt模板"],

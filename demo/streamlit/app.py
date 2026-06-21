@@ -93,6 +93,7 @@ with col2:
     st.write(""); st.write("")
     analyze_btn = st.button("🚀 Ask Agent", type="primary", use_container_width=True)
     template_name = st.selectbox("简历模板", TEMPLATE_NAMES, help="生成完整简历时使用的模板")
+    batch_mode = st.checkbox("批量岗位筛选", help="粘贴多个岗位文本，系统筛选推荐")
     st.caption("")
 
 if not analyze_btn:
@@ -108,7 +109,8 @@ if not user_input.strip():
 # ---------------------------------------------------------------------------
 with st.spinner("Agent 正在分析..."):
     svc = AgentRunService(profile_dir=PROFILE_DIR)
-    request = AgentRunRequest(user_message=user_input, raw_jd=user_input, mode=mode)
+    actual_mode = "discover_jobs" if batch_mode else mode
+    request = AgentRunRequest(user_message=user_input, raw_jd=user_input, mode=actual_mode)
     result = svc.run(request)
 
 if result.status == "failed":
@@ -156,16 +158,21 @@ if mode == "resume":
         "github": st.text_input("GitHub", key="profile_github"),
     }
     if st.button("📄 生成完整简历", type="primary"):
+        from career_agent.resume.pdf_exporter import export_pdf
         resume_md = gen.generate(
             parsed_jd=None, generated_output=None, match_analysis=None,
             profile_info=profile_info,
         )
-        st.download_button(
-            "⬇️ 下载简历 (Markdown)",
-            resume_md,
-            file_name=f"resume_{result.trace_id[:8]}.md",
-            mime="text/markdown",
-        )
+        # Generate PDF and DOCX
+        pdf_path = export_pdf(f"outputs/resumes/{result.trace_id[:8]}.pdf",
+                              profile_info=profile_info, match_result=result.match_summary,
+                              generated_bullets=result.generated_bullets)
+        col_dl1, col_dl2 = st.columns(2)
+        with col_dl1:
+            with open(pdf_path, "rb") as f:
+                st.download_button("⬇️ 下载 PDF 简历", f.read(), file_name=f"resume_{result.trace_id[:8]}.pdf", mime="application/pdf")
+        with col_dl2:
+            st.download_button("⬇️ 下载 Markdown", resume_md, file_name=f"resume_{result.trace_id[:8]}.md", mime="text/markdown")
         st.markdown(resume_md)
 
 # ---------------------------------------------------------------------------
