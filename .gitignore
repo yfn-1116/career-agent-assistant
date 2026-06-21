@@ -25,3 +25,5 @@ outputs/demo/*.md
 
 # Code intelligence index
 .codegraph/
+*.png
+src/career_agent_assistant.egg-info/
