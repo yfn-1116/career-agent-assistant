@@ -17,7 +17,8 @@ class ReplySuggestion:
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_dict(self) -> dict[str, Any]:
-        return {f.name: getattr(self, f.name) for f in self.__dataclass_fields__}
+        import dataclasses
+        return {f.name: getattr(self, f.name) for f in dataclasses.fields(self)}
 
 
 class HRReplyAssistant:

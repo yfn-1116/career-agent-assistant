@@ -1,6 +1,7 @@
 """Message Agent — generates platform-specific communication scripts."""
 
 from __future__ import annotations
+import dataclasses
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
@@ -19,7 +20,7 @@ class MessageDraft:
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_dict(self) -> dict[str, Any]:
-        return {f.name: getattr(self, f.name) for f in self.__dataclass_fields__}
+        return {f.name: getattr(self, f.name) for f in dataclasses.fields(self)}
 
 
 class MessageAgent:

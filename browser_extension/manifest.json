@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Smart Apply Agent",
+  "version": "1.3",
+  "description": "Browser-assisted Internship Copilot — analyze jobs, generate messages, never auto-send",
+  "permissions": ["activeTab", "sidePanel", "storage"],
+  "host_permissions": ["http://127.0.0.1:8765/*"],
+  "side_panel": {"default_path": "sidepanel.html"},
+  "action": {"default_title": "Smart Apply Agent"},
+  "content_scripts": [{
+    "matches": ["<all_urls>"],
+    "js": ["content_script.js"]
+  }]
+}

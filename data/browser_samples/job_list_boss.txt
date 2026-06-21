@@ -1,0 +1,22 @@
+https://www.zhipin.com/web/geek/job?query=AI实习
+搜索：AI 实习
+
+AI Agent 开发实习生
+XX科技 | 深圳 | 300-400/天
+Python, LangGraph, RAG, Agent
+
+计算机视觉实习生
+YY智能 | 北京 | 250-350/天
+Python, PyTorch, OpenCV, CNN
+
+云原生平台实习生
+ZZ云 | 杭州 | 200-300/天
+Kubernetes, Docker, Helm
+
+AI 实习生
+某公司 | 远程
+Python, Java, React, 销售, 运营
+
+后端开发实习生
+AA软件 | 广州 | 200-350/天
+Python, FastAPI, PostgreSQL, Docker

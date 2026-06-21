@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import dataclasses
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -44,8 +45,8 @@ class ApplicationRecord:
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> ApplicationRecord:
-        return cls(**{k: d.get(k, v.default if hasattr(v, "default") else v)
-                       for k, v in cls.__dataclass_fields__.items()})
+        return cls(**{f.name: d.get(f.name, f.default if f.default is not dataclasses.MISSING else "")
+                       for f in dataclasses.fields(cls)})
 
 
 class ApplicationRepository:

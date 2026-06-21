@@ -1,6 +1,7 @@
 """Job Discovery — batch screening and ranking."""
 
 from __future__ import annotations
+import dataclasses
 from dataclasses import dataclass, field
 from typing import Any
 from career_agent.job_sources.schema import JobPosting
@@ -19,7 +20,7 @@ class RankedJob:
     resume_template_suggestion: str = ""
 
     def to_dict(self) -> dict[str, Any]:
-        return {f.name: getattr(self, f.name) for f in self.__dataclass_fields__}
+        return {f.name: getattr(self, f.name) for f in dataclasses.fields(self)}
 
 
 class JobRanker:
