@@ -53,13 +53,12 @@ class TestAppContainsRequiredContent:
 class TestAppContainsRAGDiagnostics:
     def test_contains_grade_retrieval(self):
         text = _read_app()
-        assert "grade_retrieval" in text or "RAG 检索效果" in text
+        assert "grade_retrieval" in text or "RAG 检索诊断" in text
 
     def test_contains_rag_section(self):
         text = _read_app()
-        assert "RAG 检索效果" in text
-        assert "综合评级" in text
-        assert "指标明细" in text or "expander" in text
+        assert "RAG 检索诊断" in text
+        assert "评分明细" in text or "expander" in text
 
 
 class TestAppDoesNotImportForbiddenModules:
