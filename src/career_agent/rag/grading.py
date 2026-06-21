@@ -12,6 +12,13 @@ GRADE_GOOD = "good"
 GRADE_WEAK = "weak"
 GRADE_FAILED = "failed"
 
+AVERAGE_SCORE_PASS_THRESHOLD = 0.35
+KEYWORD_COVERAGE_PASS_THRESHOLD = 0.5
+SOURCE_DIVERSITY_TARGET = 3
+TOTAL_SCORE_FAILED_THRESHOLD = 0.35
+TOTAL_SCORE_GOOD_THRESHOLD = 0.65
+TOTAL_SCORE_EXCELLENT_THRESHOLD = 0.85
+
 
 @dataclass
 class RetrievalGradeItem:
@@ -46,7 +53,7 @@ def grade_retrieval(
     average_score = _average_score(evidence)
     keyword_coverage = _keyword_coverage(parsed_jd, evidence)
     source_diversity = len({ev.source_path for ev in evidence if ev.source_path})
-    traceable = all(ev.source_path and ev.chunk_id for ev in evidence)
+    traceable = all(_is_traceable(ev) for ev in evidence)
 
     items = [
         RetrievalGradeItem(
@@ -63,19 +70,19 @@ def grade_retrieval(
         RetrievalGradeItem(
             name="average_score",
             score=average_score,
-            passed=average_score >= 0.35,
+            passed=average_score >= AVERAGE_SCORE_PASS_THRESHOLD,
             message=f"Average evidence score is {average_score:.2f}.",
         ),
         RetrievalGradeItem(
             name="keyword_coverage",
             score=keyword_coverage,
-            passed=keyword_coverage >= 0.5,
+            passed=keyword_coverage >= KEYWORD_COVERAGE_PASS_THRESHOLD,
             message=f"Keyword coverage is {keyword_coverage:.2f}.",
         ),
         RetrievalGradeItem(
             name="source_diversity",
-            score=min(source_diversity / 3, 1.0),
-            passed=source_diversity >= 1,
+            score=min(source_diversity / SOURCE_DIVERSITY_TARGET, 1.0),
+            passed=source_diversity >= SOURCE_DIVERSITY_TARGET,
             message=f"Evidence comes from {source_diversity} source(s).",
             metadata={"source_count": source_diversity},
         ),
@@ -84,9 +91,9 @@ def grade_retrieval(
             score=1.0 if traceable and evidence_count > 0 else 0.0,
             passed=traceable and evidence_count > 0,
             message=(
-                "All evidence has source_path and chunk_id."
+                "All evidence has source_path, chunk_id, and numeric score."
                 if traceable and evidence_count > 0
-                else "Some evidence is missing source_path or chunk_id."
+                else "Some evidence is missing source_path, chunk_id, or numeric score."
             ),
         ),
     ]
@@ -111,7 +118,17 @@ def grade_retrieval(
 def _average_score(evidence: list[RetrievedEvidence]) -> float:
     if not evidence:
         return 0.0
+    if not all(_has_numeric_score(ev) for ev in evidence):
+        return 0.0
     return round(sum(ev.score for ev in evidence) / len(evidence), 4)
+
+
+def _is_traceable(ev: RetrievedEvidence) -> bool:
+    return bool(ev.source_path and ev.chunk_id and _has_numeric_score(ev))
+
+
+def _has_numeric_score(ev: RetrievedEvidence) -> bool:
+    return type(ev.score) in (int, float)
 
 
 def _keyword_coverage(
@@ -134,11 +151,15 @@ def _keyword_coverage(
 
 
 def _grade_from_score(total_score: float, evidence_count: int, traceable: bool) -> str:
-    if evidence_count == 0 or not traceable or total_score < 0.35:
+    if (
+        evidence_count == 0
+        or not traceable
+        or total_score < TOTAL_SCORE_FAILED_THRESHOLD
+    ):
         return GRADE_FAILED
-    if total_score >= 0.85:
+    if total_score >= TOTAL_SCORE_EXCELLENT_THRESHOLD:
         return GRADE_EXCELLENT
-    if total_score >= 0.65:
+    if total_score >= TOTAL_SCORE_GOOD_THRESHOLD:
         return GRADE_GOOD
     return GRADE_WEAK
 

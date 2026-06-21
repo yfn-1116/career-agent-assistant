@@ -1,5 +1,14 @@
 from career_agent.agents.state import ParsedJD
-from career_agent.rag.grading import RetrievalGradeReport, grade_retrieval
+from career_agent.rag.grading import (
+    AVERAGE_SCORE_PASS_THRESHOLD,
+    KEYWORD_COVERAGE_PASS_THRESHOLD,
+    SOURCE_DIVERSITY_TARGET,
+    TOTAL_SCORE_EXCELLENT_THRESHOLD,
+    TOTAL_SCORE_FAILED_THRESHOLD,
+    TOTAL_SCORE_GOOD_THRESHOLD,
+    RetrievalGradeReport,
+    grade_retrieval,
+)
 from career_agent.rag.schemas import RetrievedEvidence
 
 
@@ -64,6 +73,63 @@ def test_missing_traceability_fails():
         query="Python RAG",
         parsed_jd=jd,
         evidence=[_evidence(source_path="", chunk_id="")],
+        top_k=5,
+    )
+
+    assert report.grade == "failed"
+    traceability = [item for item in report.items if item.name == "traceability"][0]
+    assert not traceability.passed
+
+
+def test_threshold_constants_are_available_for_edge_cases():
+    assert AVERAGE_SCORE_PASS_THRESHOLD == 0.35
+    assert KEYWORD_COVERAGE_PASS_THRESHOLD == 0.5
+    assert SOURCE_DIVERSITY_TARGET == 3
+    assert TOTAL_SCORE_FAILED_THRESHOLD == 0.35
+    assert TOTAL_SCORE_GOOD_THRESHOLD == 0.65
+    assert TOTAL_SCORE_EXCELLENT_THRESHOLD == 0.85
+
+
+def test_score_at_average_threshold_passes_average_score_item():
+    jd = ParsedJD(hard_skills=["Python"], keywords=["RAG"])
+
+    report = grade_retrieval(
+        query="Python RAG",
+        parsed_jd=jd,
+        evidence=[_evidence(score=AVERAGE_SCORE_PASS_THRESHOLD)],
+        top_k=5,
+    )
+
+    average_score = [item for item in report.items if item.name == "average_score"][0]
+    assert average_score.passed
+
+
+def test_missing_score_fails_traceability():
+    jd = ParsedJD(hard_skills=["Python"], keywords=["RAG"])
+    ev = _evidence()
+    ev.score = None
+
+    report = grade_retrieval(
+        query="Python RAG",
+        parsed_jd=jd,
+        evidence=[ev],
+        top_k=5,
+    )
+
+    assert report.grade == "failed"
+    traceability = [item for item in report.items if item.name == "traceability"][0]
+    assert not traceability.passed
+
+
+def test_non_numeric_score_fails_traceability():
+    jd = ParsedJD(hard_skills=["Python"], keywords=["RAG"])
+    ev = _evidence()
+    ev.score = "0.8"
+
+    report = grade_retrieval(
+        query="Python RAG",
+        parsed_jd=jd,
+        evidence=[ev],
         top_k=5,
     )
 

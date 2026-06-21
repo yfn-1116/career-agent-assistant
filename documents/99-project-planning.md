@@ -44,7 +44,7 @@ Phase 2：LangGraph 与标准 RAG 可观测性增强
 | DEMO | DEMO-002 | Streamlit demo | Claude Code + DeepSeek | DONE | 轻量可视化，15 static tests |
 | DEPLOY | DEPLOY-001 | 学校服务器部署文档 | Claude Code + DeepSeek | DONE | CLI+Streamlit 部署，checklist |
 | WORKFLOW | WORKFLOW-002 | LangGraph workflow 集成 | Codex | NEXT | 已完成 spec 与任务卡，等待实现 |
-| RAG | RAG-006 | 检索评分与诊断报告 | Codex | TODO | RetrievalGradeReport，规则型评分 |
+| RAG | RAG-006 | 检索评分与诊断报告 | Codex | DONE | RetrievalGradeReport 已实现，规则型评分 |
 | DEMO | DEMO-003 | RAG 检索诊断展示 | Claude Code + DeepSeek | TODO | CLI + Streamlit 展示 query/grade/evidence |
 | PACKAGING | PACKAGING-001 | pyproject 与依赖规范化 | Codex | TODO | langgraph dependency + pytest 配置 |
 

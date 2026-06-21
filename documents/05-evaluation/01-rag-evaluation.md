@@ -12,6 +12,14 @@
 | keyword_coverage | JD 关键词在 evidence 中的覆盖率 | 检索方向和 JD 需求是否相关 |
 | evidence_refs | 输出引用是否可追溯 | 生成的 bullet 是否关联到检索证据 |
 
+## RetrievalGradeReport 与 EvaluationReport
+
+`RetrievalGradeReport` 是单次 RAG 检索诊断报告，用于检查一次 query 的 evidence 数量、平均分、关键词覆盖、来源多样性和可追溯性。
+
+`EvaluationReport` 是批量 / 多 JD 评估报告，用于汇总多个测试用例的整体结果。
+
+二者互补：`RetrievalGradeReport` 帮助定位单次检索质量问题，`EvaluationReport` 帮助观察整体评估表现，彼此不替代。
+
 ## 运行方式
 
 ```bash

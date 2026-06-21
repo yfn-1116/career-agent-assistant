@@ -2,6 +2,27 @@
 
 ## 2026-06-21
 
+### RAG-006 检索评分与诊断报告合规修复
+
+- Executor: Codex
+- Type: implementation / rag-evaluation
+- Summary:
+  - 补齐 RetrievalGradeReport 规则型评分合规项。
+  - 将检索评分阈值提取为命名常量。
+  - traceability 同时检查 source_path、chunk_id 和 numeric score。
+  - 补充 RetrievalGradeReport 与 EvaluationReport 的职责边界说明。
+- Changed files:
+  - src/career_agent/rag/grading.py
+  - tests/rag/test_retrieval_grading.py
+  - documents/05-evaluation/01-rag-evaluation.md
+  - documents/97-journal.md
+  - documents/99-project-planning.md
+- Validation:
+  - PYTHONPATH=src pytest tests/rag/test_retrieval_grading.py -v
+  - PYTHONPATH=src pytest tests/rag -q
+- Next:
+  - DEMO-003 RAG 检索诊断展示。
+
 ### LANGGRAPH-RAG-DESIGN 文档先行设计与任务拆分
 
 - Executor: Codex
