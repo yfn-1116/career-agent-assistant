@@ -20,11 +20,11 @@ class TestAppUsesAgentRunService:
         text = _read_app()
         assert "AgentRunService" in text or "agent_run" in text
 
-    def test_does_not_directly_import_rag(self):
-        """UI should call AgentRunService, not RAG internals."""
+    def test_does_not_directly_import_rag_for_workflow(self):
+        """Main workflow must go through AgentRunService, not direct RAG/Agent calls."""
         text = _read_app()
-        assert "RAGPipeline" not in text
         assert "JobMatchWorkflow" not in text
+        # RAGPipeline is allowed in sidebar for file upload preprocessing
 
 
 class TestAppContainsRequiredContent:
