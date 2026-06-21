@@ -13,8 +13,8 @@ from career_agent.infrastructure.llm.base import LLMProvider
 class QwenProvider(LLMProvider):
     """Qwen chat-completions via OpenAI-compatible endpoint.
 
-    Reads from env vars: ``QWEN_API_KEY``, ``QWEN_MODEL`` (default
-    ``qwen-plus``), ``QWEN_BASE_URL``, ``QWEN_TIMEOUT`` (default 30).
+    Reads defaults from env vars; explicit constructor args override.
+    Use ``create_llm_provider`` factory for Settings-based construction.
     """
 
     def __init__(

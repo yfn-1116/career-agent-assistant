@@ -13,8 +13,8 @@ from career_agent.infrastructure.llm.base import LLMProvider
 class DeepSeekProvider(LLMProvider):
     """DeepSeek chat-completions API.
 
-    Reads from env vars: ``DEEPSEEK_API_KEY``, ``DEEPSEEK_MODEL``
-    (default ``deepseek-chat``), ``DEEPSEEK_BASE_URL``, ``DEEPSEEK_TIMEOUT``.
+    Reads defaults from env vars; explicit constructor args override.
+    Use ``create_llm_provider`` factory for Settings-based construction.
     """
 
     def __init__(

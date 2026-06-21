@@ -103,6 +103,9 @@ class EmbeddingSettings:
     provider: str = field(
         default_factory=lambda: _env("EMBEDDING_PROVIDER", "mock")
     )
+    api_key: str = field(
+        default_factory=lambda: _env("EMBEDDING_API_KEY", "") or _env("QWEN_API_KEY", "")
+    )
     model: str = field(default_factory=lambda: _env("EMBEDDING_MODEL", ""))
     dim: int = field(default_factory=lambda: _env_int("EMBEDDING_DIM", 1024))
     batch_size: int = field(

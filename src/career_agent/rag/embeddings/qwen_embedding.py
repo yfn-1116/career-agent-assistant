@@ -11,8 +11,7 @@ from career_agent.rag.embeddings.base import EmbeddingProvider
 class QwenEmbeddingProvider(EmbeddingProvider):
     """Qwen text embedding via OpenAI-compatible API.
 
-    Env vars: ``QWEN_API_KEY``, ``QWEN_EMBEDDING_MODEL`` (default ``text-embedding-v3``),
-    ``QWEN_EMBEDDING_BASE_URL`` (default dashscope compatible-mode endpoint).
+    Reads defaults from env vars; explicit constructor args override.
     """
 
     def __init__(
@@ -27,7 +26,7 @@ class QwenEmbeddingProvider(EmbeddingProvider):
             or "https://dashscope.aliyuncs.com/compatible-mode/v1"
         ).rstrip("/")
         self.model = model or os.getenv("QWEN_EMBEDDING_MODEL") or "text-embedding-v3"
-        self._dim = None  # lazy from first call
+        self._dim = None
 
     @property
     def dimension(self) -> int:

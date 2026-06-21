@@ -572,11 +572,12 @@ def run_langgraph_workflow(
     raw_jd="", *, top_k=5, profile_dir="", output_dir="outputs/demo",
     jd_parser=None, rag_pipeline=None, match_agent=None, build_agent=None,
 ):
-    import os as _os
+    from career_agent.core.settings import Settings
 
-    # Auto-build HybridRetriever if Qwen key available
+    _settings = Settings()
+    # Auto-build HybridRetriever if embedding API key available
     hr = None
-    if _os.getenv("QWEN_API_KEY"):
+    if _settings.embedding.api_key:
         try:
             kw_store = MemoryVectorStore()
             emb_provider = QwenEmbeddingProvider()
