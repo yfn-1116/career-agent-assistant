@@ -119,19 +119,11 @@ class TestToolRegistry:
 
 
 REQUIRED_TOOLS = [
-    "parse_jd",
-    "plan_queries",
-    "rewrite_query",
-    "retrieve_profile",
-    "rerank_chunks",
-    "grade_retrieval",
-    "select_evidence",
-    "analyze_match",
-    "generate_grounded_answer",
-    "check_faithfulness",
-    "fallback",
-    "write_report",
-    "write_diagnostics",
+    "parse_jd", "plan_queries", "rewrite_query", "retrieve_profile",
+    "rerank_chunks", "grade_retrieval", "select_evidence",
+    "analyze_match", "generate_grounded_answer", "check_faithfulness",
+    "fallback", "write_report", "write_diagnostics",
+    "web_search", "github_repo",
 ]
 
 

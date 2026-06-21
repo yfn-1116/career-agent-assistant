@@ -420,19 +420,83 @@ class WriteDiagnosticsTool(Tool):
         )
 
 
+class WebSearchTool(Tool):
+    name = "web_search"
+    description = "Search the web for company/industry/job information"
+
+    @property
+    def safety_notes(self) -> list[str]:
+        return ["搜索结果作为参考，不作为 evidence 直接用于简历", "不搜索个人隐私"]
+
+    def run(self, query: str = "", max_results: int = 5, **kwargs: Any) -> ToolResult:  # noqa: ARG002
+        if not query.strip():
+            return ToolResult(success=False, error="query is required")
+        try:
+            try:
+                from ddgs import DDGS
+            except ImportError:
+                from duckduckgo_search import DDGS
+            results = []
+            with DDGS() as ddgs:
+                for r in ddgs.text(query, max_results=max_results):
+                    results.append({"title": r.get("title", ""), "url": r.get("href", ""), "snippet": r.get("body", "")[:300]})
+            return ToolResult(success=True, output={"results": results, "query": query},
+                              summary=f"found {len(results)} results for: {query[:60]}")
+        except Exception as e:
+            return ToolResult(success=False, error=str(e), summary="web search failed")
+
+
+class GitHubRepoTool(Tool):
+    name = "github_repo"
+    description = "Read a public GitHub repo (README, docs, metadata)"
+
+    @property
+    def safety_notes(self) -> list[str]:
+        return ["只读公开仓库", "不修改任何 GitHub 内容", "不使用 API key 访问私有仓库"]
+
+    def run(self, repo_name: str = "", **kwargs: Any) -> ToolResult:  # noqa: ARG002
+        if not repo_name.strip():
+            return ToolResult(success=False, error="repo_name is required")
+        try:
+            from career_agent.github.remote_repo_reader import GitHubRemoteReader
+            reader = GitHubRemoteReader()
+            docs = reader.read_repo(repo_name)
+            if docs:
+                snippets = [{"title": d.title, "source": d.source_path, "snippet": d.content[:200]} for d in docs]
+                return ToolResult(success=True, output={"repo": repo_name, "documents": snippets, "count": len(docs)},
+                                  summary=f"read {len(docs)} docs from {repo_name}")
+
+            # Fallback: try raw.githubusercontent.com (no rate limit)
+            import urllib.request
+            url = f"https://raw.githubusercontent.com/{repo_name}/main/README.md"
+            try:
+                req = urllib.request.Request(url, headers={"User-Agent": "smart-apply-agent"})
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    content = resp.read().decode("utf-8", errors="replace")
+                return ToolResult(success=True,
+                                  output={"repo": repo_name, "documents": [{"title": "README.md", "snippet": content[:500]}]},
+                                  summary=f"read README from {repo_name} (raw)")
+            except Exception:
+                return ToolResult(success=True, output={"repo": repo_name, "documents": [], "count": 0},
+                                  summary=f"unable to read {repo_name} (try setting GITHUB_TOKEN)")
+        except Exception as e:
+            return ToolResult(success=False, error=str(e), summary=f"github read failed: {repo_name}")
+
+
 # ---------------------------------------------------------------------------
 # Factory
 # ---------------------------------------------------------------------------
 
 
 def create_standard_registry() -> ToolRegistry:
-    """Create a ToolRegistry with all 13 standard tools registered."""
+    """Create a ToolRegistry with all 15 standard tools registered."""
     reg = ToolRegistry()
     for tool_cls in [
         ParseJDTool, PlanQueriesTool, RewriteQueryTool, RetrieveProfileTool,
         RerankChunksTool, GradeRetrievalTool, SelectEvidenceTool,
         AnalyzeMatchTool, GenerateGroundedAnswerTool, CheckFaithfulnessTool,
         FallbackTool, WriteReportTool, WriteDiagnosticsTool,
+        WebSearchTool, GitHubRepoTool,
     ]:
         reg.register(tool_cls())
     return reg
