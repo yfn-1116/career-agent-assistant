@@ -111,6 +111,21 @@ with st.spinner("正在初始化知识库并运行匹配分析..."):
     wf = JobMatchWorkflow(profile_dir=PROFILE_DIR)
     state = wf.run(jd_text, top_k=top_k)
 
+    # Run retrieval grading for RAG diagnostics
+    from career_agent.agents.rag_retrieve_agent import RAGRetrieveAgent
+    from career_agent.rag.grading import grade_retrieval
+
+    retrieval_query = ""
+    if state.parsed_jd is not None:
+        _rag_agent = RAGRetrieveAgent(pipeline=wf.rag_pipeline)
+        retrieval_query = _rag_agent.build_query_from_parsed_jd(state.parsed_jd)
+    grade_report = grade_retrieval(
+        query=retrieval_query,
+        parsed_jd=state.parsed_jd,
+        evidence=state.retrieved_evidence,
+        top_k=top_k,
+    )
+
 if state.status == "failed":
     st.error(f"运行失败：{state.error_message}")
     st.stop()
@@ -141,6 +156,32 @@ for i, ev in enumerate(state.retrieved_evidence, 1):
         st.markdown(f"**来源**：`{ev.source_path}`")
         st.markdown(f"**匹配关键词**：{', '.join(ev.matched_keywords)}")
         st.text(ev.content[:300])
+
+# -- RAG Diagnostics --
+st.markdown("## 🔍 RAG 检索效果")
+st.caption("规则型诊断评分，非人工标注或 LLM judge")
+col_d1, col_d2, col_d3 = st.columns(3)
+with col_d1:
+    st.metric("综合评级", grade_report.grade.title())
+with col_d2:
+    st.metric("总分", f"{grade_report.metadata.get('total_score', 0):.2f}")
+with col_d3:
+    st.metric("关键词覆盖率", f"{grade_report.keyword_coverage:.2f}")
+
+st.markdown(f"**检索 Query**：`{retrieval_query or grade_report.query}`")
+
+with st.expander("📊 指标明细", expanded=False):
+    for item in grade_report.items:
+        icon = "✅" if item.passed else "❌"
+        st.markdown(f"- {icon} **{item.name}**: {item.message} (score={item.score:.2f})")
+
+if grade_report.evidence_summaries:
+    st.markdown("### 📋 Top Evidence")
+    for i, summary in enumerate(grade_report.evidence_summaries, 1):
+        with st.expander(f"证据 {i}：{summary.get('title', 'N/A')} (score: {summary.get('score', 0):.2f})"):
+            st.markdown(f"**来源**：`{summary.get('source_path', 'N/A')}`")
+            st.markdown(f"**匹配关键词**：{', '.join(summary.get('matched_keywords', []))}")
+            st.text(summary.get('snippet', ''))
 
 # -- Analysis --
 if state.match_analysis:

@@ -54,9 +54,19 @@ class TestDefaultRun:
         text = DEFAULT_OUTPUT.read_text(encoding="utf-8")
         assert "JD 解析结果" in text
         assert "RAG 检索证据" in text
+        assert "RAG 检索诊断" in text
         assert "匹配分析" in text
         assert "生成输出" in text
         assert "运行说明" in text
+
+    def test_output_contains_rag_diagnostics(self):
+        result = _run_demo()
+        assert result.returncode == 0
+        text = DEFAULT_OUTPUT.read_text(encoding="utf-8")
+        assert "综合评级" in text
+        assert "指标明细" in text
+        assert "Top Evidence 详情" in text
+        assert "检索 Query" in text
 
     def test_terminal_output_shows_status(self):
         result = _run_demo()

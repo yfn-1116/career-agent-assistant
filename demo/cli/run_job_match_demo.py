@@ -104,8 +104,17 @@ def _render_usage_section(
     return "\n".join(lines)
 
 
-def render_report(state, args: argparse.Namespace) -> str:
-    """Build a self-contained Markdown report from AgentTaskState."""
+def render_report(
+    state,
+    args: argparse.Namespace,
+    grade_report=None,
+    retrieval_query: str = "",
+) -> str:
+    """Build a self-contained Markdown report from AgentTaskState.
+
+    If *grade_report* (a ``RetrievalGradeReport``) is provided, a
+    dedicated RAG diagnostics section is included.
+    """
     lines: list[str] = []
     L = lines.append  # noqa: E741
 
@@ -154,8 +163,40 @@ def render_report(state, args: argparse.Namespace) -> str:
         L(f"> {snippet}...")
         L("")
 
-    # -- Section 4 ----------------------------------------------------------
-    L("## 4. 匹配分析")
+    # -- Section 4: RAG Diagnostics (only if grade_report provided) --------
+    if grade_report is not None:
+        L("## 4. RAG 检索诊断")
+        L("")
+        L(f"- 检索 Query：`{retrieval_query or grade_report.query}`")
+        L(f"- 综合评级：**{grade_report.grade}**"
+          f"（total_score={grade_report.metadata.get('total_score', grade_report.average_score):.2f}）")
+        L("")
+        L("### 指标明细")
+        L("")
+        L("| 指标 | 得分 | 通过 | 说明 |")
+        L("|------|------|------|------|")
+        for item in grade_report.items:
+            icon = "✅" if item.passed else "❌"
+            L(f"| {item.name} | {item.score:.2f} | {icon} | {item.message} |")
+        L("")
+        L(f"> ⚠️ 评分基于规则型诊断，不是人工标注或 LLM judge。"
+          f"来源文件数={grade_report.source_diversity}，"
+          f"关键词覆盖率={grade_report.keyword_coverage:.2f}。")
+        L("")
+        if grade_report.evidence_summaries:
+            L("### Top Evidence 详情")
+            L("")
+            for i, summary in enumerate(grade_report.evidence_summaries, 1):
+                L(f"**{i}. {summary.get('title', 'N/A')}**")
+                L(f"- score：{summary.get('score', 0):.2f}")
+                L(f"- source：`{summary.get('source_path', 'N/A')}`")
+                L(f"- matched_keywords：{', '.join(summary.get('matched_keywords', []))}")
+                L(f"- snippet：{summary.get('snippet', '')}")
+                L("")
+
+    # -- Section 5 ----------------------------------------------------------
+    section_idx = 5 if grade_report is not None else 4
+    L(f"## {section_idx}. 匹配分析")
     L("")
     ma = state.match_analysis
     if ma is not None:
@@ -180,8 +221,9 @@ def render_report(state, args: argparse.Namespace) -> str:
         L("（无匹配分析结果）")
     L("")
 
-    # -- Section 5 ----------------------------------------------------------
-    L("## 5. 生成输出")
+    # -- Section N+1 --------------------------------------------------------
+    section_idx += 1
+    L(f"## {section_idx}. 生成输出")
     L("")
     go = state.generated_output
     if go is not None:
@@ -203,8 +245,12 @@ def render_report(state, args: argparse.Namespace) -> str:
         L("（无生成输出）")
     L("")
 
-    # -- Section 6 ----------------------------------------------------------
-    L(_render_usage_section(args, state))
+    # -- Section N+2 --------------------------------------------------------
+    section_idx += 1
+    # Rewrite the usage section header to match the dynamic number
+    usage_text = _render_usage_section(args, state)
+    usage_text = usage_text.replace("## 6. 运行说明", f"## {section_idx}. 运行说明")
+    L(usage_text)
 
     return "\n".join(lines)
 
@@ -293,6 +339,24 @@ def main() -> None:
     if args.use_embedding:
         state.metadata["embedding_provider"] = "Qwen text-embedding-v3"
 
+    # Run retrieval grading for RAG diagnostics
+    from career_agent.agents.rag_retrieve_agent import RAGRetrieveAgent
+    from career_agent.rag.grading import grade_retrieval
+
+    retrieval_query = ""
+    if state.parsed_jd is not None:
+        _rag_agent = RAGRetrieveAgent(pipeline=rag_pipeline or wf.rag_pipeline)
+        retrieval_query = _rag_agent.build_query_from_parsed_jd(state.parsed_jd)
+    grade_report = grade_retrieval(
+        query=retrieval_query,
+        parsed_jd=state.parsed_jd,
+        evidence=state.retrieved_evidence,
+        top_k=args.top_k,
+    )
+    print(f"检索诊断：grade={grade_report.grade}, "
+          f"total={grade_report.metadata.get('total_score', 0):.2f}, "
+          f"coverage={grade_report.keyword_coverage:.2f}")
+
     # Print brief summary to terminal
     direction = state.parsed_jd.job_direction if state.parsed_jd else "unknown"
     print(f"任务状态：{state.status}")
@@ -304,7 +368,7 @@ def main() -> None:
 
     # Write report
     output_file.parent.mkdir(parents=True, exist_ok=True)
-    report = render_report(state, args)
+    report = render_report(state, args, grade_report=grade_report, retrieval_query=retrieval_query)
     output_file.write_text(report, encoding="utf-8")
     print(f"输出文件：{output_file}")
     print("Done.")

@@ -50,6 +50,18 @@ class TestAppContainsRequiredContent:
         assert "streamlit run" in text or "运行" in text or "pip install" in text
 
 
+class TestAppContainsRAGDiagnostics:
+    def test_contains_grade_retrieval(self):
+        text = _read_app()
+        assert "grade_retrieval" in text or "RAG 检索效果" in text
+
+    def test_contains_rag_section(self):
+        text = _read_app()
+        assert "RAG 检索效果" in text
+        assert "综合评级" in text
+        assert "指标明细" in text or "expander" in text
+
+
 class TestAppDoesNotImportForbiddenModules:
     def test_no_fastapi(self):
         text = _read_app()

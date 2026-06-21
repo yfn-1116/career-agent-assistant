@@ -2,6 +2,28 @@
 
 ## 2026-06-21
 
+### DEMO-003 RAG 检索诊断展示
+
+- Executor: Claude Code
+- Type: feature / demo
+- Summary:
+  - CLI 报告新增 "RAG 检索诊断" 章节（section 4），展示 query、综合评级、指标明细表、Top Evidence 详情。
+  - Streamlit 新增 "RAG 检索效果" 区域，展示 grade、总分、关键词覆盖率、指标明细、evidence expandable sections。
+  - 两个 demo 均在 workflow 完成后调用 `grade_retrieval()` 生成 `RetrievalGradeReport`，展示层只读取结果不实现评分逻辑。
+  - CLI 和 Streamlit 均标注评分是规则型诊断，非人工标注或 LLM judge。
+- Changed files:
+  - `demo/cli/run_job_match_demo.py`
+  - `demo/streamlit/app.py`
+  - `tests/demo/test_cli_demo_smoke.py`
+  - `tests/demo/test_streamlit_app_static.py`
+  - `documents/97-journal.md`
+- Validation:
+  - `python -m pytest -q` — 290 passed
+  - `python demo/cli/run_job_match_demo.py` — 报告含 RAG 检索诊断章节
+  - `python demo/cli/run_job_match_demo.py --use-langgraph` — LangGraph 路径不变
+- Next:
+  - 可按需继续后续任务卡或进入展示准备阶段。
+
 ### WORKFLOW-002 LangGraph Workflow 迁移
 
 - Executor: Claude Code (接管自 Codex)
