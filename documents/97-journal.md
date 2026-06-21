@@ -2,6 +2,25 @@
 
 ## 2026-06-21
 
+### RAG-006 布尔检索评分覆盖补充
+
+- Executor: Codex
+- Type: test / docs
+- Summary:
+  - 补充 bool score 拒绝测试，固定 True 不能作为检索 score 通过 traceability。
+  - 更新 traceability 文案，明确 score 必须是 0.0 到 1.0 的有限归一化数值。
+- Changed files:
+  - src/career_agent/rag/grading.py
+  - tests/rag/test_retrieval_grading.py
+  - documents/05-evaluation/01-rag-evaluation.md
+  - documents/97-journal.md
+- Validation:
+  - PYTHONPATH=src pytest tests/rag/test_retrieval_grading.py::test_boolean_score_fails_traceability -v
+  - PYTHONPATH=src pytest tests/rag/test_retrieval_grading.py -v
+  - PYTHONPATH=src pytest tests/rag -q
+- Next:
+  - 继续按任务卡推进 RAG 诊断展示。
+
 ### RAG-006 检索评分范围质量修复
 
 - Executor: Codex

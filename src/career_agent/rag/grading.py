@@ -95,9 +95,9 @@ def grade_retrieval(
             score=1.0 if traceable and evidence_count > 0 else 0.0,
             passed=traceable and evidence_count > 0,
             message=(
-                "All evidence has source_path, chunk_id, and numeric score."
+                "All evidence has source_path, chunk_id, and finite normalized score in [0.0, 1.0]."
                 if traceable and evidence_count > 0
-                else "Some evidence is missing source_path, chunk_id, or numeric score."
+                else "Some evidence is missing source_path, chunk_id, or finite normalized score in [0.0, 1.0]."
             ),
         ),
     ]

@@ -216,6 +216,23 @@ def test_missing_score_fails_traceability():
     assert not traceability.passed
 
 
+def test_boolean_score_fails_traceability():
+    jd = ParsedJD(hard_skills=["Python"], keywords=["RAG"])
+    ev = _evidence()
+    ev.score = True
+
+    report = grade_retrieval(
+        query="Python RAG",
+        parsed_jd=jd,
+        evidence=[ev],
+        top_k=5,
+    )
+
+    assert report.grade == "failed"
+    traceability = [item for item in report.items if item.name == "traceability"][0]
+    assert not traceability.passed
+
+
 def test_nan_score_fails_traceability():
     jd = ParsedJD(hard_skills=["Python"], keywords=["RAG"])
     ev = _evidence()

@@ -22,7 +22,7 @@
 | average_score | evidence score 平均值达到阈值 | 检索结果整体相关性是否足够 |
 | keyword_coverage | JD hard_skills / bonus_skills / keywords 在 matched_keywords 或 evidence content 中覆盖 | 检索结果是否覆盖关键岗位要求 |
 | source_diversity | evidence 来源数量达到目标 | 结果是否过度集中于单一来源 |
-| traceability | 每条 evidence 有 source_path、chunk_id 和 numeric score | 诊断结果是否可追溯到原始证据 |
+| traceability | 每条 evidence 有 source_path、chunk_id 和 finite normalized score `0.0-1.0` | 诊断结果是否可追溯到原始证据 |
 
 ## RetrievalGradeReport 与 EvaluationReport
 
