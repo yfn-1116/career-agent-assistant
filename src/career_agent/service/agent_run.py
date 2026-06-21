@@ -23,8 +23,9 @@ class AgentRunRequest:
 
     user_message: str = ""
     raw_jd: str = ""
-    mode: str = "analyze"  # analyze / resume / chat
+    mode: str = "analyze_job"  # analyze_job / discover_jobs / generate_message / tailor_resume / handle_hr_reply
     profile_scope: str = ""
+    hr_message: str = ""  # for handle_hr_reply mode
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
@@ -35,17 +36,25 @@ class AgentRunResult:
     trace_id: str = ""
     final_answer: str = ""
     match_summary: dict[str, Any] = field(default_factory=dict)
+    match_score: float = 0.0
+    recommended_action: str = ""
     generated_bullets: list[str] = field(default_factory=list)
     communication_script: str = ""
+    message_draft: dict[str, Any] | None = None
     evidence_sources: list[str] = field(default_factory=list)
+    can_write_claims: list[str] = field(default_factory=list)
+    cannot_write_claims: list[str] = field(default_factory=list)
     retrieval_grade: str = ""
     retrieval_total_score: float = 0.0
     retry_count: int = 0
     decision: str = ""
     report_path: str = ""
     diagnostics_path: str = ""
+    approval_required: bool = False
+    application_record_id: str = ""
     status: str = "running"
     warnings: list[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
@@ -78,13 +87,22 @@ class AgentRunService:
         output_dir: str = "outputs/demo",
     ) -> AgentRunResult:
         """Execute the workflow and return structured result."""
-        jd = request.raw_jd or request.user_message
+        mode = request.mode
 
+        if mode == "discover_jobs":
+            return self._run_discovery(request, output_dir)
+        elif mode == "generate_message":
+            return self._run_message(request, output_dir)
+        elif mode == "handle_hr_reply":
+            return self._run_hr_reply(request, output_dir)
+        else:
+            return self._run_analyze(request, output_dir)
+
+    def _run_analyze(self, request: AgentRunRequest, output_dir: str) -> AgentRunResult:
+        """Analyze a single job posting."""
+        jd = request.raw_jd or request.user_message
         state = run_langgraph_workflow(
-            raw_jd=jd,
-            top_k=5,
-            profile_dir=self.profile_dir,
-            output_dir=output_dir,
+            raw_jd=jd, top_k=5, profile_dir=self.profile_dir, output_dir=output_dir,
         )
 
         # Build result from state
@@ -203,3 +221,76 @@ class AgentRunService:
                 lines.append(f"- {w}")
 
         return "\n".join(lines)
+
+    def _run_discovery(self, request: AgentRunRequest, output_dir: str) -> AgentRunResult:
+        """Batch screen multiple jobs from text."""
+        from career_agent.job_sources.parser import JobPostingParser
+        from career_agent.discovery.ranker import JobRanker
+        from career_agent.profile.loader import ProfileLoader
+        from career_agent.rag.loaders.markdown_loader import MarkdownProfileLoader
+        from career_agent.rag.chunking.text_chunker import TextChunker
+
+        parser = JobPostingParser()
+        postings = parser.parse_batch(request.user_message)
+        loader = ProfileLoader()
+        md_loader = MarkdownProfileLoader()
+        chunker = TextChunker()
+        docs = md_loader.load_directory(self.profile_dir)
+        items = loader.load_documents(docs)
+
+        ranker = JobRanker()
+        ranked = ranker.rank(postings, items)
+
+        lines = [f"共分析 {len(ranked)} 个岗位：", ""]
+        for i, rj in enumerate(ranked[:5], 1):
+            action_emoji = {"strong_apply": "🟢", "apply_with_resume_adjustment": "🟡",
+                            "apply_only_if_interested": "🟠", "skip": "🔴", "not_priority": "🔴"}
+            emoji = action_emoji.get(rj.recommended_action, "")
+            jp = rj.job_posting
+            lines.append(f"### {i}. {emoji} {jp.job_title or '未知岗位'} (score={rj.match_score:.2f})")
+            lines.append(f"- 公司: {jp.company or '未知'} | {jp.location or ''}")
+            lines.append(f"- 匹配: {', '.join(rj.matched_skills[:5]) or '无'}")
+            lines.append(f"- 缺失: {', '.join(rj.missing_skills[:5]) or '无'}")
+            lines.append(f"- 建议: {rj.recommended_action}")
+            lines.append("")
+
+        return AgentRunResult(
+            trace_id=uuid.uuid4().hex[:12],
+            final_answer="\n".join(lines),
+            match_score=ranked[0].match_score if ranked else 0.0,
+            recommended_action=ranked[0].recommended_action if ranked else "skip",
+            status="completed",
+        )
+
+    def _run_message(self, request: AgentRunRequest, output_dir: str) -> AgentRunResult:
+        """Generate communication script."""
+        from career_agent.messages.agent import MessageAgent
+        agent = MessageAgent()
+        draft = agent.generate("boss_greeting", job_title="该岗位")
+        approval = False
+        if draft.risk_warnings:
+            approval = True
+        return AgentRunResult(
+            trace_id=uuid.uuid4().hex[:12],
+            final_answer=f"**建议话术**：\n\n{draft.text}",
+            communication_script=draft.text,
+            message_draft=draft.to_dict(),
+            approval_required=approval,
+            warnings=draft.risk_warnings,
+            status="completed",
+        )
+
+    def _run_hr_reply(self, request: AgentRunRequest, output_dir: str) -> AgentRunResult:
+        """Generate HR reply suggestion."""
+        from career_agent.conversation.reply import HRReplyAssistant
+        assistant = HRReplyAssistant()
+        reply = assistant.suggest(request.hr_message or request.user_message)
+        approval = True  # HR replies always need approval
+        return AgentRunResult(
+            trace_id=uuid.uuid4().hex[:12],
+            final_answer=f"**建议回复**：\n\n{reply.suggested_reply}",
+            communication_script=reply.suggested_reply,
+            approval_required=approval,
+            warnings=reply.risk_warnings,
+            status="completed",
+        )
