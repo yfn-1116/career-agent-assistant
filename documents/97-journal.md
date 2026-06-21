@@ -1,5 +1,31 @@
 # 项目日志
 
+## 2026-06-21
+
+### LANGGRAPH-RAG-DESIGN 文档先行设计与任务拆分
+
+- Executor: Codex
+- Type: architecture / planning
+- Summary:
+  - 新增 LangGraph workflow 与标准 RAG 可观测性设计 spec。
+  - 确认采用“标准化重构”：LangGraph 编排 + 标准 RAG 流程 + 规则型检索评分。
+  - 新增 WORKFLOW-002 / RAG-006 / DEMO-003 / PACKAGING-001 任务卡。
+  - 新增实施计划，后续按任务卡和计划执行代码修改。
+- Changed files:
+  - docs/superpowers/specs/2026-06-21-langgraph-rag-standardization-design.md
+  - docs/superpowers/tasks/WORKFLOW-002-langgraph-workflow.md
+  - docs/superpowers/tasks/RAG-006-retrieval-grading.md
+  - docs/superpowers/tasks/DEMO-003-rag-diagnostics-display.md
+  - docs/superpowers/tasks/PACKAGING-001-pyproject-and-dependencies.md
+  - docs/superpowers/plans/2026-06-21-langgraph-rag-standardization.md
+  - documents/97-journal.md
+  - documents/99-project-planning.md
+- Validation:
+  - 本轮为文档先行与计划编写，未修改核心实现代码。
+  - 设计 spec 已由用户确认。
+- Next:
+  - 按计划执行 WORKFLOW-002 / RAG-006 / DEMO-003 / PACKAGING-001。
+
 ## 2026-06-20
 
 ### REVIEW-002 / PRESENTATION-001 / RESUME-001 最终审查与展示材料

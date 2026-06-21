@@ -2,11 +2,11 @@
 
 ## 当前阶段
 
-Phase 1：文档补强与架构边界定义
+Phase 2：LangGraph 与标准 RAG 可观测性增强
 
 ## 阶段目标
 
-明确第一阶段 RAG + 多 Agent 原型系统的边界、模块契约、任务拆分和后续执行顺序。当前阶段仍然不实现业务代码。
+在已完成 MVP 的基础上，引入 LangGraph workflow、标准化 RAG 检索诊断、CLI/Streamlit 可视化报告和 Python 依赖规范化。
 
 ## 任务状态说明
 
@@ -43,6 +43,10 @@ Phase 1：文档补强与架构边界定义
 | DEMO | DEMO-001 | CLI demo | Claude Code + DeepSeek | DONE | CLI + Markdown 报告，10 smoke tests |
 | DEMO | DEMO-002 | Streamlit demo | Claude Code + DeepSeek | DONE | 轻量可视化，15 static tests |
 | DEPLOY | DEPLOY-001 | 学校服务器部署文档 | Claude Code + DeepSeek | DONE | CLI+Streamlit 部署，checklist |
+| WORKFLOW | WORKFLOW-002 | LangGraph workflow 集成 | Codex | NEXT | 已完成 spec 与任务卡，等待实现 |
+| RAG | RAG-006 | 检索评分与诊断报告 | Codex | TODO | RetrievalGradeReport，规则型评分 |
+| DEMO | DEMO-003 | RAG 检索诊断展示 | Claude Code + DeepSeek | TODO | CLI + Streamlit 展示 query/grade/evidence |
+| PACKAGING | PACKAGING-001 | pyproject 与依赖规范化 | Codex | TODO | langgraph dependency + pytest 配置 |
 
 ## 建议任务顺序
 
@@ -64,6 +68,10 @@ Phase 1：文档补强与架构边界定义
 16. DEMO-001 CLI demo。
 17. DEMO-002 Streamlit demo。
 18. DEPLOY-001 学校服务器部署文档。
+19. WORKFLOW-002 LangGraph workflow 集成。← 下一步，Codex
+20. RAG-006 检索评分与诊断报告。
+21. DEMO-003 RAG 检索诊断展示。
+22. PACKAGING-001 pyproject 与依赖规范化。
 
 ## 分工建议
 
