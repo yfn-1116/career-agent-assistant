@@ -1,248 +1,294 @@
-# Phase 2 任务拆分
+# Phase 2 任务拆分（更新版）
 
-## 总览
+## 任务顺序
 
-| Task | 名称 | 层 | 依赖 | 预计改动文件 |
-|------|------|-----|------|-------------|
-| B | Domain Schema Standardization | domain | — | ~6 |
-| C | Industrial Hybrid Retrieval | infrastructure | B | ~5 |
-| D | Reranker | infrastructure | B | ~4 |
-| E | Agentic Retry Workflow | graph | C, D | ~3 |
-| F | Tool Calling Agent Layer | application | B, C | ~6 |
-| G | Faithfulness / Grounding Checker | application | B | ~4 |
-| H | Diagnostics and Evaluation | interface | E, F, G | ~8 |
+| Task | 名称 | 层 | 状态 |
+|------|------|-----|------|
+| B | Domain Schema Standardization | domain | ✅ |
+| C | Environment / Configuration / Docker | infrastructure | ⏳ |
+| D | LLM Provider Abstraction | infrastructure | ⏳ |
+| E | Industrial Hybrid Retrieval | infrastructure | ✅ |
+| F | Reranker | infrastructure | ⏳ |
+| G | Agentic Retry Workflow | graph | ⏳ |
+| H | Grounded Generation / Faithfulness Checker | application | ⏳ |
+| I | Unified Agent Run Service | application | ⏳ |
+| J | Codex-like Streamlit Agent UI | interface | ⏳ |
+| K | Diagnostics / Offline Evaluation | interface | ⏳ |
 
----
-
-## Task B：Domain Schema Standardization
-
-**目标**：统一核心数据结构，dataclass + 序列化 + 约束校验。
-
-**文件**：
-- `src/career_agent/domain/__init__.py` (NEW)
-- `src/career_agent/domain/schemas.py` (NEW) — ParsedJD, RetrievalQuery, RetrievedChunk, RetrievalScore, Evidence, GeneratedBullet, ToolCallTrace, WorkflowTrace, AgentDecision, FaithfulnessReport
-- `src/career_agent/domain/validation.py` (NEW) — score range check, bool rejection
-- `tests/domain/__init__.py` (NEW)
-- `tests/domain/test_schemas.py` (NEW)
-
-**约束**：
-- 不修改现有 RAG grading API
-- 不修改现有 agent 业务逻辑
-- domain 层零外部依赖
-
-**测试**：
-- score 必须是 [0, 1] finite float
-- bool 拒绝为 score
-- 序列化/反序列化
-- generated content 必须可关联 evidence
-
-**commit**: `feat: standardize agentic rag domain schemas`
+**依赖关系**：
+```
+B ──► C ──► D ──► E ──► F ──► G ──► H ──► I ──► J ──► K
+                              │                        │
+                              └────────────────────────┘
+```
+C 必须前置（后续所有模块从 settings 读配置）。
 
 ---
 
-## Task C：Industrial Hybrid Retrieval
+## Task B：Domain Schema Standardization ✅
 
-**目标**：keyword + vector 并行检索 + 分数融合。
-
-**文件**：
-- `src/career_agent/rag/retrievers/hybrid_retriever.py` (NEW)
-- `src/career_agent/rag/retrievers/__init__.py`
-- `tests/rag/test_hybrid_retrieval.py` (NEW)
-
-**依赖**：Task B (RetrievedChunk schema)
-
-**约束**：
-- keyword retriever 和 embedding retriever 可独立开关
-- embedding 不可用时回退到 keyword-only
-- 不破坏 MemoryVectorStore / EmbeddingVectorStore
-
-**测试**：
-- keyword only 命中
-- vector only 命中
-- hybrid fusion 后匹配项排名上升
-- metadata boost 生效
-- score 范围合法 [0, 1]
-- 不回退 substring 误匹配
-
-**commit**: `feat: implement industrial hybrid retriever`
+已完成。364 测试通过。11 个 dataclass schema + score validation。
 
 ---
 
-## Task D：Reranker
+## Task C：Environment / Configuration / Docker Standardization
+
+**目标**：所有参数集中配置，零硬编码。
+
+### C1. 依赖管理
+- `pyproject.toml` 区分 core / dev / demo / optional 依赖
+- core: langgraph, pydantic (if needed), python-dotenv, pyyaml
+- rag: (current deps)
+- ui: streamlit
+- dev: pytest
+
+### C2. .env.example
+```
+APP_ENV=local
+LOG_LEVEL=INFO
+LLM_PROVIDER=mock
+LLM_API_KEY=
+LLM_MODEL=
+EMBEDDING_PROVIDER=mock
+EMBEDDING_MODEL=
+EMBEDDING_DIM=1024
+VECTOR_STORE_BACKEND=memory
+CHUNK_SIZE=800
+CHUNK_OVERLAP=100
+RETRIEVAL_TOP_K=8
+RERANK_TOP_K=5
+MIN_RETRIEVAL_SCORE=0.65
+MAX_RETRIES=2
+HYBRID_VECTOR_WEIGHT=0.40
+HYBRID_KEYWORD_WEIGHT=0.35
+HYBRID_METADATA_WEIGHT=0.15
+HYBRID_PRIORITY_WEIGHT=0.10
+OUTPUT_DIR=outputs
+RAG_REPORT_DIR=outputs/rag_reports
+DIAGNOSTICS_DIR=outputs/diagnostics
+STREAMLIT_PORT=8501
+```
+
+### C3. Settings 模块
+`src/career_agent/core/settings.py`：
+- `AppSettings` — env, log_level, output dirs
+- `LLMSettings` — provider, api_key, model, timeout, max_retries
+- `EmbeddingSettings` — provider, model, dim, batch_size
+- `RAGSettings` — chunk_size, chunk_overlap, top_k, rerank_top_k
+- `HybridRetrievalSettings` — vector/kw/meta/priority weights, min_retrieval_score
+- `OutputSettings` — output_dir, rag_report_dir, diagnostics_dir, trace_dir
+
+校验规则：
+- weights 总和 ≈ 1.0（0.99-1.01）
+- top_k > 0, chunk_size > 0, max_retries >= 0
+- score thresholds ∈ [0, 1]
+
+### C4. Docker
+- `Dockerfile` — python:3.12-slim, pip install -e ., streamlit
+- `docker-compose.yml` — app service, volumes: data/ + outputs/, env_file: .env, ports: 8501
+- `.dockerignore` — .git, __pycache__, .pytest_cache, outputs/
+
+### C5. 接入
+- 后续 Task D-K 全部从 settings 读参数
+- 业务代码不直接 os.getenv
+
+### 测试
+- `tests/core/test_settings.py`
+- 默认 settings 加载
+- hybrid weights 合法
+- 非法 top_k / chunk_size 报错
+- bool score 配置拒绝
+- output dirs 可从 env 覆盖
+- LLM provider 默认 mock
+
+### 验收
+```bash
+python -m pytest -q tests/core/test_settings.py
+cp .env.example .env && docker compose up --build  # 可选验证
+```
+
+---
+
+## Task D：LLM Provider Abstraction
+
+**目标**：统一 LLM 接口，支持 Qwen/DeepSeek/Mock，不散落在业务代码里。
+
+### 文件
+- `src/career_agent/infrastructure/llm/__init__.py` (NEW)
+- `src/career_agent/infrastructure/llm/base.py` (NEW)
+- `src/career_agent/infrastructure/llm/qwen_provider.py`
+- `src/career_agent/infrastructure/llm/deepseek_provider.py`
+- `src/career_agent/infrastructure/llm/mock_provider.py`
+- `tests/infrastructure/test_llm_providers.py` (NEW)
+
+### 接口
+```python
+class LLMProvider(ABC):
+    def generate(prompt, system_prompt=None) -> str
+    def generate_structured(prompt, schema) -> dict
+    @property
+    def model_name() -> str
+    @property
+    def is_available() -> bool
+```
+
+### LLM 使用边界
+- 允许：结构化解析、query rewrite、匹配分析、生成回答、faithfulness check
+- 禁止：编造经历、绕过 evidence、直接执行工具
+
+### Fallback
+- LLM 不可用 → 回退规则
+- trace 记录 llm_unavailable
+
+### 测试
+- MockLLMProvider 可构造
+- Qwen/DeepSeek provider 从 settings 读配置
+- 无 API key 时 is_available=False
+- generate_structured 返回合法 JSON
+
+---
+
+## Task E：Industrial Hybrid Retrieval ✅
+
+已完成。HybridRetriever + normalize_scores + metadata_score。22 tests。
+
+---
+
+## Task F：Reranker
 
 **目标**：检索后 lightweight 重排序。
 
-**文件**：
+### 文件
 - `src/career_agent/rag/reranker.py` (NEW)
 - `tests/rag/test_reranker.py` (NEW)
 
-**依赖**：Task B (RetrievedChunk schema)
+### 约束
+- 默认规则实现
+- 输入 list[RetrievedChunk]，输出 re-ranked list[RetrievedChunk]
+- 每个 chunk 写入 rerank_score + rerank_reason
+- 从 settings 读 rerank_top_k
 
-**约束**：
-- 默认规则实现，不调 LLM
-- 接口预留 LLM reranker 扩展点
-- 每个 chunk 输出 rerank_score + rerank_reason
-
-**测试**：
-- skill overlap 高分项排名上升
+### 测试
+- skill overlap 高分排名上升
 - duplicate source 被惩罚
-- 太短/太长内容被惩罚
+- 太短/太长被惩罚
 - rerank_reason 非空
 - score 范围合法
 
-**commit**: `feat: add lightweight reranker`
-
 ---
 
-## Task E：Agentic Retry Workflow
+## Task G：Agentic Retry Workflow
 
-**目标**：LangGraph 条件分叉 + query rewrite retry + fallback。
+**目标**：LangGraph 条件分叉 + rewrite_query retry + fallback。
 
-**文件**：
+### 文件
 - `src/career_agent/workflows/langgraph_workflow.py`
 - `tests/workflows/test_langgraph_workflow.py`
 
-**依赖**：Task C, Task D
+### 约束
+- score >= MIN_RETRIEVAL_SCORE → analyze_match
+- score < threshold 且 retry < max → rewrite_query
+- retry >= max → fallback
+- fallback 不编造经历
+- 从 settings 读 min_retrieval_score 和 max_retries
 
-**约束**：
-- 不重写所有 node，只加条件边和 rewrite/fallback 逻辑
-- 已有 7 个 LangGraph 测试不回归
-- retrieval grading API 不变
-
-**测试**：
+### 测试
 - low score 触发 retry
-- high score 直接进入 analyze
-- max retry 后进入 fallback
-- fallback 不生成 unsupported bullet
+- high score 直接通过
+- max retry 后 fallback
 - retry_history 写入
 
-**commit**: `feat: add agentic retry workflow with conditional branching`
-
 ---
 
-## Task F：Tool Calling Agent Layer
+## Task H：Grounded Generation / Faithfulness Checker
 
-**目标**：tool interface + registry + planner + trace。
+**目标**：每条生成内容可溯源，防止幻觉。
 
-**文件**：
-- `src/career_agent/tools/__init__.py` (NEW)
-- `src/career_agent/tools/base.py` (NEW) — Tool interface
-- `src/career_agent/tools/registry.py` (NEW) — ToolRegistry
-- `src/career_agent/tools/planner.py` (NEW) — RulePlanner
-- `src/career_agent/tools/trace.py` (NEW) — ToolCallTrace
-- `tests/tools/__init__.py` (NEW)
-- `tests/tools/test_tool_calling.py` (NEW)
-
-**依赖**：Task B, Task C
-
-**约束**：
-- planner 是规则型，但 tool 有标准接口（后续可换 LLM planner）
-- 不能调用 registry 外 tool
-- 每个 tool call 写入 trace
-
-**测试**：
-- registry 包含所有必需 tool
-- planner 根据 state 选对 tool
-- 未注册 tool 不能调用
-- trace 记录完整
-
-**commit**: `feat: add controlled tool calling agent layer`
-
----
-
-## Task G：Faithfulness / Grounding Checker
-
-**目标**：每条生成内容必须可溯源，防止幻觉。
-
-**文件**：
+### 文件
 - `src/career_agent/evaluation/faithfulness.py` (NEW)
 - `tests/evaluation/test_faithfulness.py` (NEW)
 
-**依赖**：Task B
+### 约束
+- GeneratedBullet 必须有 evidence_ids
+- 检测夸大 claims
+- faithfulness_score < 0.75 → revise_required
+- LLM 可用于 faithfulness check（可选）
 
-**约束**：
-- 默认规则实现
-- 不修改 BuildAgent 内部逻辑
-- faithfulness_score < 0.75 时标记 revise_required
-- 不编造经历作为 evidence
-
-**测试**：
+### 测试
 - 无 evidence 的 bullet 被拒绝
 - 夸大 claim 被标记
-- 有 source 的 bullet 通过
+- 正常 bullet 通过
 - unsupported_claims 输出
-
-**commit**: `feat: add grounded generation checker`
 
 ---
 
-## Task H：Diagnostics and Evaluation
+## Task I：Unified Agent Run Service
 
-**目标**：JSON diagnostics + 增强 Markdown + eval dataset + eval runner。
+**目标**：UI 不拼流程，统一入口调用 LangGraph。
 
-**文件**：
-- `src/career_agent/evaluation/diagnostics.py` (NEW) — JSON writer
-- `src/career_agent/evaluation/report_writer.py` (NEW) — 增强 Markdown
-- `data/eval/jd_cases.jsonl` (NEW) — 8+ JD eval dataset
-- `scripts/run_eval.py` (NEW) — eval runner
-- `demo/cli/run_job_match_demo.py` — 调用 diagnostics writer
-- `demo/streamlit/app.py` — 展示增强内容
+### 文件
+- `src/career_agent/service/__init__.py` (NEW)
+- `src/career_agent/service/agent_run.py` (NEW)
+- `tests/service/test_agent_run.py` (NEW)
+
+### 接口
+```
+AgentRunService.run(AgentRunRequest) → AgentRunResult
+```
+
+### 约束
+- UI 不直接调 RAG/Agent 细节
+- Service 内部调 LangGraph workflow
+- 支持 mode: analyze / resume / chat
+
+---
+
+## Task J：Codex-like Streamlit Agent UI
+
+**目标**：极简对话式 Agent 界面。
+
+### 文件
+- `demo/streamlit/app.py`（重写为 Agent 对话界面）
+
+### 布局
+- 输入框 + Ask Agent 按钮
+- Agent 回答区域（最终结论）
+- 展开详情（技术细节折叠）
+- 执行步骤简洁展示
+
+### 约束
+- 不引入复杂前端框架
+- 不做 dashboard
+- 默认不展示技术细节
+- 调用 AgentRunService
+
+---
+
+## Task K：Diagnostics / Offline Evaluation
+
+**目标**：完整 diagnostics JSON + eval dataset + eval runner。
+
+### 文件
+- `src/career_agent/evaluation/diagnostics.py` (NEW)
+- `data/eval/jd_cases.jsonl` (NEW)
+- `scripts/run_eval.py` (NEW)
 - `tests/evaluation/test_diagnostics.py` (NEW)
 - `tests/evaluation/test_eval_runner.py` (NEW)
 
-**依赖**：Task E, Task F, Task G
-
-**验收**：
-- diagnostics JSON 创建
-- Markdown report 含 hybrid table, retry history, source mapping
-- eval runner 可跑 8 个 JD
-- Hit@K, MRR, Skill Coverage, Source Precision, Faithfulness Pass Rate 有输出
-
-**commit**: `feat: add rag agent diagnostics and evaluation`
+### 验收
+- diagnostics JSON 含完整 trace
+- Markdown report 含 hybrid table + retry history + source mapping
+- eval runner 可跑 8+ JD
+- Hit@K, MRR, Skill Coverage, Source Precision, Faithfulness Pass Rate 输出
 
 ---
 
 ## 质量门禁（每个 Task）
 
 ```bash
-# 1. 核心回归
-python -m pytest -q tests/rag/test_retrieval_grading.py
-
-# 2. 本任务新增测试
-python -m pytest -q tests/<new_module>/
-
-# 3. 已有 workflow 测试不回归
-python -m pytest -q tests/workflows/
-
-# 4. Demo 可运行
-python demo/cli/run_job_match_demo.py
-
-# 5. git status 干净（仅本任务文件）
-git status --short
+python -m pytest -q tests/rag/test_retrieval_grading.py  # 核心回归
+python -m pytest -q tests/<new>/                          # 新增测试
+python -m pytest -q tests/workflows/                     # workflow 不回归
+python demo/cli/run_job_match_demo.py                    # demo 可运行
+git status --short                                         # 干净
 ```
-
----
-
-## 实现顺序
-
-```
-Task B (domain) ─────────────────────────────┐
-                                              │
-Task C (hybrid) ───┐                          │
-                   ├── Task E (retry) ──┐     │
-Task D (reranker) ─┘                    │     │
-                                        │     │
-                   Task F (tools) ──────┤     │
-                                        │     │
-                   Task G (faithfulness)┤     │
-                                        ├── Task H (diagnostics)
-                                        │
-                                        │
-```
-
-Task B 必须先做（所有后续 task 依赖 schema）。
-Task C 和 D 可并行。
-Task E 依赖 C+D。
-Task F 依赖 B+C。
-Task G 依赖 B。
-Task H 依赖 E+F+G。
