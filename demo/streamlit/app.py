@@ -127,47 +127,45 @@ for msg in st.session_state.messages:
 # Input
 col1, col2 = st.columns([5, 1])
 with col1:
-    user_input = st.text_area("📝", placeholder="粘贴岗位 JD，或输入「帮我分析适合什么岗位」「搜一下 Agent 实习」", label_visibility="collapsed", height=80)
+    user_input = st.text_area("💬", placeholder="问我任何求职问题，或直接粘贴 JD...", label_visibility="collapsed", height=80)
 with col2:
     st.write(""); st.write("")
-    mode = st.selectbox("模式", ["分析+话术+简历", "只看匹配", "批量筛选", "生成话术", "生成简历"], label_visibility="collapsed")
     send = st.button("🚀 发送", use_container_width=True, type="primary")
 
 if send and user_input.strip():
     st.session_state.messages.append({"role": "user", "content": user_input})
     with st.chat_message("user"): st.markdown(user_input)
+
+    # 判断是 JD 分析还是普通对话
+    is_jd = any(kw in user_input for kw in ["岗位要求", "岗位职责", "任职要求", "职位描述", "JD", "招聘", "薪资", "实习"])
+    is_long = len(user_input) > 200
+
     with st.chat_message("assistant"):
-        with st.spinner("检索资料 + 大模型分析..."):
+        with st.spinner("思考中..."):
 
-            # Step 1: RAG pipeline
-            from career_agent.service.agent_run import AgentRunRequest, AgentRunService
-            svc = AgentRunService(profile_dir="data/samples/profile")
-            result = svc.run(AgentRunRequest(user_message=user_input, raw_jd=user_input, mode="analyze_job"))
+            if is_jd or is_long:
+                # === JD 模式：完整 RAG + Agent 分析 ===
+                from career_agent.service.agent_run import AgentRunRequest, AgentRunService
+                svc = AgentRunService(profile_dir="data/samples/profile")
+                result = svc.run(AgentRunRequest(user_message=user_input, raw_jd=user_input, mode="analyze_job"))
 
-            # Step 2: LLM analysis
-            llm_answer = _llm(
-                f"""用户Profile: {st.session_state.profile_summary}
+                jd_prompt = f"""你是一个实习求职投递管家。基于以下信息给用户一个自然、有用的回答。
+
+用户画像: {st.session_state.profile_summary}
 知识库: {st.session_state.kb_chunks} 条资料
 GitHub: {', '.join(st.session_state.github_repos)}
-
-RAG 分析结果: {result.final_answer[:2000]}
-
+RAG 检索: {result.final_answer[:2000]}
 用户输入: {user_input}
 
-请输出:
-1. **匹配度评估** (一句话)
-2. **你的优势** (3-5 bullet)
-3. **需要准备的** (3 bullet)
-4. **建议沟通话术** (一段,100字内)
-5. **建议搜索关键词** (5个)
-6. **下一步行动** (2-3项)""",
-                "你是实习求职投递管家。简洁、精准、可执行。不编造经历。"
-            ) or result.final_answer
+用对话的语气回复，包括：
+1. 匹配度判断
+2. 优势和不足
+3. 可以怎么准备
+4. 沟通话术（如果需要）
+5. 下一步建议"""
+                answer = _llm(jd_prompt, "你是求职投递管家，像朋友一样聊天，简洁直接。") or result.final_answer
 
-            st.markdown(llm_answer)
-
-            # Step 3: Auto-save if JD detected
-            if "岗位" in user_input or "JD" in user_input.upper() or "要求" in user_input:
+                # Auto-save
                 app_id = _save_application(
                     job_title=user_input.split("\n")[0][:50],
                     company="", jd_text=user_input,
@@ -175,9 +173,24 @@ RAG 分析结果: {result.final_answer[:2000]}
                     message=result.communication_script,
                     resume_md="\n".join(result.generated_bullets)
                 )
-                st.success(f"📌 已保存投递记录 #{app_id}")
+                st.success(f"📌 已保存 #{app_id}")
 
-            st.session_state.messages.append({"role": "assistant", "content": llm_answer})
+            else:
+                # === 对话模式：LLM + 知识库 ===
+                ctx = f"""你是用户的求职顾问，像朋友一样聊天。简洁、真诚。
+
+用户画像: {st.session_state.profile_summary}
+知识库: {st.session_state.kb_chunks} 条资料
+GitHub: {', '.join(st.session_state.github_repos)}
+之前的对话: {chr(10).join(f'{m[\"role\"]}: {m[\"content\"][:200]}' for m in st.session_state.messages[-6:])}
+
+用户问: {user_input}
+
+根据用户的真实资料回答。如果信息不足，诚实说不知道。像朋友聊天，不要列太多 bullet point。"""
+                answer = _llm(ctx, "你是求职顾问，像朋友一样聊天。简洁、真诚、基于用户真实资料。") or "抱歉，LLM 不可用。"
+
+            st.markdown(answer)
+            st.session_state.messages.append({"role": "assistant", "content": answer})
 
 # ---- Footer: Application Records ----
 st.divider()
