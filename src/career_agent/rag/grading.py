@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import re
 from dataclasses import dataclass, field
 from typing import Any
@@ -129,7 +130,11 @@ def _is_traceable(ev: RetrievedEvidence) -> bool:
 
 
 def _has_numeric_score(ev: RetrievedEvidence) -> bool:
-    return type(ev.score) in (int, float)
+    if isinstance(ev.score, bool):
+        return False
+    if not isinstance(ev.score, (int, float)):
+        return False
+    return math.isfinite(float(ev.score))
 
 
 def _keyword_coverage(

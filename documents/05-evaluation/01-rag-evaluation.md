@@ -44,7 +44,7 @@ cat outputs/demo/evaluation_report.md
 | 维度 | MemoryVectorStore | EmbeddingVectorStore |
 |---|---|---|
 | 匹配方式 | 关键词 Token 重叠 | Hash trigram 余弦相似度 |
-| 语义理解 | 无 | 有限（trigram 共享子串） |
+| 语义理解 | 无 | 无；仅提供 lexical / fuzzy substring similarity |
 | 外部依赖 | 无 | 无 |
 | 生产可用 | 否 | 否 |
 

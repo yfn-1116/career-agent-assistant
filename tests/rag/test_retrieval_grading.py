@@ -1,3 +1,5 @@
+import math
+
 from career_agent.agents.state import ParsedJD
 from career_agent.rag.grading import (
     AVERAGE_SCORE_PASS_THRESHOLD,
@@ -201,6 +203,40 @@ def test_missing_score_fails_traceability():
     jd = ParsedJD(hard_skills=["Python"], keywords=["RAG"])
     ev = _evidence()
     ev.score = None
+
+    report = grade_retrieval(
+        query="Python RAG",
+        parsed_jd=jd,
+        evidence=[ev],
+        top_k=5,
+    )
+
+    assert report.grade == "failed"
+    traceability = [item for item in report.items if item.name == "traceability"][0]
+    assert not traceability.passed
+
+
+def test_nan_score_fails_traceability():
+    jd = ParsedJD(hard_skills=["Python"], keywords=["RAG"])
+    ev = _evidence()
+    ev.score = math.nan
+
+    report = grade_retrieval(
+        query="Python RAG",
+        parsed_jd=jd,
+        evidence=[ev],
+        top_k=5,
+    )
+
+    assert report.grade == "failed"
+    traceability = [item for item in report.items if item.name == "traceability"][0]
+    assert not traceability.passed
+
+
+def test_infinite_score_fails_traceability():
+    jd = ParsedJD(hard_skills=["Python"], keywords=["RAG"])
+    ev = _evidence()
+    ev.score = math.inf
 
     report = grade_retrieval(
         query="Python RAG",
