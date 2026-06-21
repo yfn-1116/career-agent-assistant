@@ -105,6 +105,35 @@ class AgentRunService:
             raw_jd=jd, top_k=5, profile_dir=self.profile_dir, output_dir=output_dir,
         )
 
+        # Enhance with LLM if available
+        llm_answer = ""
+        try:
+            from career_agent.infrastructure.llm.qwen_provider import QwenProvider
+            llm = QwenProvider()
+            if llm.is_available:
+                pj = state.get("parsed_jd")
+                ma = state.get("match_analysis")
+                rs = state.get("retrieval_scores")
+                prompt = f"""你是一个实习求职助手。根据以下分析结果，用中文给用户一个简洁、可执行的回答。
+
+岗位：{pj.job_title if pj else '未知'}
+方向：{pj.job_direction if pj else '未知'}
+技能要求：{', '.join(pj.hard_skills[:10]) if pj else '未知'}
+
+匹配优势：{chr(10).join(f'- {s}' for s in ma.strengths[:5]) if ma else '无'}
+待补充：{chr(10).join(f'- {w}' for w in ma.weaknesses[:5]) if ma else '无'}
+检索质量：{rs.grade if rs else 'unknown'} (score={rs.metadata.get('total_score', 0) if rs else 0:.2f})
+
+请输出：
+1. 总体匹配判断（1-2句）
+2. 你的优势（bullet points）
+3. 需要补充的（bullet points）
+4. 沟通建议
+5. 下一步行动建议"""
+                llm_answer = llm.generate(prompt, system_prompt="你是专业的实习求职助手，回答简洁、可执行、不编造经历。")
+        except Exception:
+            llm_answer = ""
+
         # Build result from state
         warnings: list[str] = []
         if state["decision"] == "fallback":
@@ -113,7 +142,7 @@ class AgentRunService:
             )
 
         # Build final answer
-        final_answer = self._build_final_answer(state, request.mode, warnings)
+        final_answer = llm_answer or self._build_final_answer(state, request.mode, warnings)
 
         # Extract evidence sources
         sources: list[str] = []
