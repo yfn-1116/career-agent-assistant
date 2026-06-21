@@ -176,18 +176,37 @@ RAG 检索: {result.final_answer[:2000]}
                 st.success(f"📌 已保存 #{app_id}")
 
             else:
-                # === 对话模式：LLM + 知识库 ===
+                # === 对话模式：LLM + 知识库检索 ===
+                # 1. RAG 检索相关知识
+                rag_context = ""
+                if st.session_state.kb_chunks > 0 and "kw_store" in st.session_state:
+                    try:
+                        evidence = st.session_state.kw_store.search(user_input, top_k=3)
+                        rag_context = "\n".join(
+                            f"[{e.source_path}] {e.content[:200]}" for e in evidence
+                        )
+                    except Exception:
+                        pass
+
+                # 2. LLM 回答
                 ctx = f"""你是用户的求职顾问，像朋友一样聊天。简洁、真诚。
 
-用户画像: {st.session_state.profile_summary}
-知识库: {st.session_state.kb_chunks} 条资料
-GitHub: {', '.join(st.session_state.github_repos)}
-之前的对话: {chr(10).join(f'{m[\"role\"]}: {m[\"content\"][:200]}' for m in st.session_state.messages[-6:])}
+你的知识库包含用户以下资料:
+- GitHub 仓库: {', '.join(st.session_state.github_repos) if st.session_state.github_repos else '暂无'}
+- 资料库: {st.session_state.kb_chunks} 条已索引内容
+- 用户画像: {st.session_state.profile_summary or '待分析'}
+
+知识库检索到的相关内容:
+{rag_context or '未检索到相关内容'}
 
 用户问: {user_input}
 
-根据用户的真实资料回答。如果信息不足，诚实说不知道。像朋友聊天，不要列太多 bullet point。"""
-                answer = _llm(ctx, "你是求职顾问，像朋友一样聊天。简洁、真诚、基于用户真实资料。") or "抱歉，LLM 不可用。"
+规则:
+- 如果用户问「能看到我的仓库吗」，如实说能看到的仓库名，并说出仓库的主要内容
+- 基于检索到的内容回答，能引用具体的文件名
+- 如果信息不足，诚实说「你的资料库里还没有相关内容，可以上传更多资料」
+- 像朋友聊天，不要列太多 bullet point"""
+                answer = _llm(ctx, "你是求职顾问，像朋友一样聊天。能看到用户的GitHub和资料库。简洁、真诚。") or "抱歉，LLM 不可用。"
 
             st.markdown(answer)
             st.session_state.messages.append({"role": "assistant", "content": answer})
