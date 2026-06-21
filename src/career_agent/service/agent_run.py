@@ -134,13 +134,35 @@ class AgentRunService:
         grade = rs.grade if rs is not None else "unknown"
         total = rs.metadata.get("total_score", 0) if rs is not None else 0.0
 
+        from career_agent.matching.scorer import JobMatchScorer
+        from career_agent.profile.loader import ProfileLoader
+        from career_agent.rag.loaders.markdown_loader import MarkdownProfileLoader
+        try:
+            p_items = ProfileLoader().load_documents(MarkdownProfileLoader().load_directory(self.profile_dir))
+            pj = state.get("parsed_jd")
+            scorer = JobMatchScorer()
+            match_result = scorer.score(
+                pj.job_title if pj else "", pj.hard_skills if pj else [],
+                pj.bonus_skills if pj else [], p_items,
+            )
+            _match_score = match_result.match_score
+            _action = match_result.recommended_action
+            _matched = match_result.matched_skills
+            _missing = match_result.missing_skills
+        except Exception:
+            _match_score = 0.0; _action = ""; _matched = []; _missing = []
+
         return AgentRunResult(
             trace_id=state["trace_id"],
             final_answer=final_answer,
+            match_score=_match_score,
+            recommended_action=_action or decision,
             match_summary={
                 "decision": state["decision"],
                 "retry_count": state.get("retry_count", 0),
                 "missing_keywords": state.get("missing_keywords", []),
+                "matched_skills": _matched,
+                "missing_skills": _missing,
             },
             generated_bullets=bullets,
             communication_script=comm,
