@@ -88,8 +88,8 @@ def _render_usage_section(
     else:
         mode_parts.append("JD 解析 / 匹配分析 / 输出生成：基于规则和模板")
 
-    if args.use_embedding:
-        emb = state.metadata.get("embedding_provider", "Qwen text-embedding-v3")
+    if state.metadata.get("embedding_provider"):
+        emb = state.metadata["embedding_provider"]
         mode_parts.append(f"语义检索：{emb}")
     else:
         mode_parts.append("检索方式：内存关键词匹配（MemoryVectorStore）")
@@ -313,7 +313,15 @@ def main() -> None:
                 print(f"⚠️  无法初始化 DeepSeek：{e}，回退到规则型")
 
     rag_pipeline = None
-    if args.use_embedding:
+    use_embedding = args.use_embedding
+    emb_provider = None
+
+    # Auto-detect Qwen embedding if API key is set
+    import os as _os
+    if not use_embedding and _os.getenv("QWEN_API_KEY"):
+        use_embedding = True
+
+    if use_embedding:
         from career_agent.rag.embeddings.embedding_store import EmbeddingVectorStore
         from career_agent.rag.embeddings.qwen_embedding import QwenEmbeddingProvider
         from career_agent.rag.pipeline import RAGPipeline
@@ -321,7 +329,7 @@ def main() -> None:
             emb_provider = QwenEmbeddingProvider()
             emb_store = EmbeddingVectorStore(emb_provider)
             rag_pipeline = RAGPipeline(vectorstore=emb_store)
-            print(f"🔍 已启用 Qwen Embedding 语义检索（model: {emb_provider.model}）")
+            print(f"🔍 已启用千问 Embedding 语义检索 (model={emb_provider.model}, dim={emb_provider.dimension})")
         except Exception as e:
             print(f"⚠️  无法初始化 Embedding：{e}，回退到关键词检索")
 
@@ -336,8 +344,8 @@ def main() -> None:
     # Attach provider metadata for report rendering
     if args.use_llm:
         state.metadata["llm_provider"] = args.model_provider
-    if args.use_embedding:
-        state.metadata["embedding_provider"] = "Qwen text-embedding-v3"
+    if use_embedding and emb_provider is not None:
+        state.metadata["embedding_provider"] = f"Qwen {emb_provider.model}"
 
     # Run retrieval grading for RAG diagnostics
     from career_agent.agents.rag_retrieve_agent import RAGRetrieveAgent
@@ -409,7 +417,12 @@ def _run_langgraph_demo(args: argparse.Namespace, job_text: str) -> None:
             except Exception as e:
                 print(f"⚠️  无法初始化 DeepSeek：{e}，回退到规则型")
 
-    if args.use_embedding:
+    use_emb = args.use_embedding
+    import os as _os2
+    if not use_emb and _os2.getenv("QWEN_API_KEY"):
+        use_emb = True
+
+    if use_emb:
         from career_agent.rag.embeddings.embedding_store import EmbeddingVectorStore
         from career_agent.rag.embeddings.qwen_embedding import QwenEmbeddingProvider
         from career_agent.rag.pipeline import RAGPipeline
@@ -417,7 +430,7 @@ def _run_langgraph_demo(args: argparse.Namespace, job_text: str) -> None:
             emb_provider = QwenEmbeddingProvider()
             emb_store = EmbeddingVectorStore(emb_provider)
             rag_pipeline = RAGPipeline(vectorstore=emb_store)
-            print(f"🔍 [LangGraph] 已启用 Qwen Embedding 语义检索（model: {emb_provider.model}）")
+            print(f"🔍 [LangGraph] 已启用千问 Embedding 语义检索（model: {emb_provider.model}）")
         except Exception as e:
             print(f"⚠️  无法初始化 Embedding：{e}，回退到关键词检索")
 
