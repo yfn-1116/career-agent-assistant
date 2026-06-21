@@ -1,0 +1,8 @@
+yfn-1116/career-agent-assistant
+yfn-1116/chem-auto-titration
+yfn-1116/polyu-internship-project
+yfn-1116/machine-learning-labs
+yfn-1116/phone_case_finder
+yfn-1116/cnn-mnist-homework
+yfn-1116/mlp-mnist-homework
+yfn-1116/LeetCode
