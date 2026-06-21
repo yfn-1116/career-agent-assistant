@@ -101,19 +101,22 @@ with st.sidebar:
     st.metric("已索引", st.session_state.kb_chunks)
 
     # File upload
-    uploaded = st.file_uploader("上传简历/项目", type=["pdf","docx","md","txt"], accept_multiple_files=True, key="up")
-    if uploaded and st.button("📥 导入文件"):
+    uploaded = st.file_uploader("上传简历/项目 (PDF/DOCX/MD)", type=["pdf","docx","md","txt"], accept_multiple_files=True)
+    if uploaded and st.button("📥 导入到知识库"):
+        upload_dir = Path("data/uploads")
+        upload_dir.mkdir(parents=True, exist_ok=True)
         for f in uploaded:
-            with tempfile.NamedTemporaryFile(delete=False, suffix=Path(f.name).suffix) as tmp:
-                tmp.write(f.read()); tp = tmp.name
+            # 保存到磁盘
+            save_path = upload_dir / f.name
+            save_path.write_bytes(f.read())
+            st.info(f"📄 正在解析 {f.name}...")
             try:
                 from career_agent.rag.loaders.file_loader import FileLoader
-                doc = FileLoader().load(tp)
+                doc = FileLoader().load(save_path)
                 n = _rag_index(doc.content, f.name)
-                st.success(f"✅ {f.name} → {n} chunks")
-                os.unlink(tp)
+                st.success(f"✅ {f.name} → {n} chunks (已导入知识库)")
             except Exception as e:
-                st.error(f"❌ {f.name}: {e}")
+                st.error(f"❌ {f.name}: 解析失败 — {e}")
         st.rerun()
 
     # GitHub
