@@ -67,6 +67,37 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
+def _render_usage_section(
+    args: argparse.Namespace, state: "AgentTaskState"
+) -> str:
+    lines: list[str] = []
+    L = lines.append  # noqa: E741
+
+    L("## 6. 运行说明")
+    L("")
+    mode_parts: list[str] = []
+    if args.use_llm:
+        provider = "Qwen (通义千问)" if args.model_provider == "qwen" else "DeepSeek"
+        mode_parts.append(f"LLM 增强：{provider}")
+    else:
+        mode_parts.append("JD 解析 / 匹配分析 / 输出生成：基于规则和模板")
+
+    if args.use_embedding:
+        emb = state.metadata.get("embedding_provider", "Qwen text-embedding-v3")
+        mode_parts.append(f"语义检索：{emb}")
+    else:
+        mode_parts.append("检索方式：内存关键词匹配（MemoryVectorStore）")
+
+    for p in mode_parts:
+        L(f"- {p}")
+
+    L(f"- 任务状态：{state.status}")
+    L(f"- Profile 目录：`{args.profile_dir}`")
+    L(f"- JD 文件：`{args.job_file}`")
+    L("")
+    return "\n".join(lines)
+
+
 def render_report(state, args: argparse.Namespace) -> str:
     """Build a self-contained Markdown report from AgentTaskState."""
     lines: list[str] = []
@@ -167,14 +198,7 @@ def render_report(state, args: argparse.Namespace) -> str:
     L("")
 
     # -- Section 6 ----------------------------------------------------------
-    L("## 6. 运行说明")
-    L("")
-    L("- 本 demo 使用**本地规则和内存关键词检索**，**不调用任何外部大模型**。")
-    L("- JD 解析、匹配分析和输出生成均基于规则和模板，保证可复现。")
-    L("- 检索依赖用户在 `data/samples/profile/` 中的 Markdown 资料。")
-    L("- 后续可通过接入 DeepSeek / OpenAI API 升级为 LLM 驱动版本。")
-    L("- 后续可通过 Streamlit 提供可视化展示。")
-    L("")
+    L(_render_usage_section(args, state))
 
     return "\n".join(lines)
 
@@ -253,6 +277,11 @@ def main() -> None:
         build_agent=build_agent,
     )
     state = wf.run(job_text, top_k=args.top_k)
+    # Attach provider metadata for report rendering
+    if args.use_llm:
+        state.metadata["llm_provider"] = args.model_provider
+    if args.use_embedding:
+        state.metadata["embedding_provider"] = "Qwen text-embedding-v3"
 
     # Print brief summary to terminal
     direction = state.parsed_jd.job_direction if state.parsed_jd else "unknown"

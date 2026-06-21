@@ -22,3 +22,6 @@ outputs/demo/*.md
 .idea/
 .vscode/
 .playwright-mcp/
+
+# Code intelligence index
+.codegraph/
