@@ -58,11 +58,33 @@ def compute_metrics(results: list) -> dict:
         source_precisions.append(prec)
     avg_source_precision = sum(source_precisions) / len(source_precisions) if source_precisions else 0.0
 
-    # Skill Coverage: retrieval keyword_coverage
-    skill_coverages = []
-    for _, r in results:
-        rs = r.retrieval_total_score
-        skill_coverages.append(rs)
+    # Hit@K: fraction of cases where at least one expected source appears in top-K
+    hit_count = 0
+    for case, r in results:
+        expected = set(case.get("expected_sources", []))
+        found_sources = {Path(s).name for s in r.evidence_sources}
+        if expected & found_sources:
+            hit_count += 1
+    hit_at_k = hit_count / total if total else 0.0
+
+    # MRR: Mean Reciprocal Rank — avg 1/rank of first relevant source
+    mrr_scores = []
+    for case, r in results:
+        expected = set(case.get("expected_sources", []))
+        for rank, src in enumerate(r.evidence_sources, 1):
+            if Path(src).name in expected:
+                mrr_scores.append(1.0 / rank)
+                break
+        else:
+            mrr_scores.append(0.0)
+    mrr = sum(mrr_scores) / len(mrr_scores) if mrr_scores else 0.0
+
+    # Faithfulness pass rate
+    faith_pass = sum(1 for _, r in results if r.status == "completed")
+    faith_rate = faith_pass / total if total else 0.0
+
+    # Skill Coverage
+    skill_coverages = [r.retrieval_total_score for _, r in results]
     avg_skill_coverage = sum(skill_coverages) / len(skill_coverages) if skill_coverages else 0.0
 
     return {
@@ -70,9 +92,12 @@ def compute_metrics(results: list) -> dict:
         "passed": passed,
         "fallback": fallback,
         "pass_rate": passed / total if total else 0,
+        "hit_at_k": round(hit_at_k, 4),
+        "mrr": round(mrr, 4),
         "avg_retrieval_score": round(avg_score, 4),
         "avg_source_precision": round(avg_source_precision, 4),
         "avg_skill_coverage": round(avg_skill_coverage, 4),
+        "faithfulness_pass_rate": round(faith_rate, 4),
     }
 
 

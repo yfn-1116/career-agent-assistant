@@ -214,17 +214,24 @@ def rerank_node(state, *, ctx):
 
     reranked = ctx.reranker.rerank(domain_chunks, jd_skills=jd_skills if jd_skills else None)
 
-    # Convert back to RetrievedEvidence with rerank metadata
+    # Convert back to RetrievedEvidence — merge (not replace) metadata
     result = []
-    for dc in reranked:
+    for dc, orig_ev in zip(reranked, chunks):
+        base_meta = dict(orig_ev.metadata) if isinstance(orig_ev.metadata, dict) else {}
+        base_meta.update({
+            "rerank_score": dc.rerank_score,
+            "rerank_reason": dc.rerank_reason,
+            "final_hybrid_score": dc.final_hybrid_score,
+            "keyword_score": dc.keyword_score,
+            "vector_score": dc.vector_score,
+        })
         result.append(RetrievedEvidence(
             evidence_id=f"rerank-{dc.chunk_id}", chunk_id=dc.chunk_id,
             title=dc.source.split("/")[-1] if dc.source else "",
             content=dc.content, score=dc.rerank_score,
             source_path=dc.source,
             matched_keywords=list(dc.matched_skills),
-            metadata={"rerank_score": dc.rerank_score, "rerank_reason": dc.rerank_reason,
-                      "final_hybrid_score": dc.final_hybrid_score},
+            metadata=base_meta,
         ))
 
     state["logs"].append(f"rerank: {len(result)} chunks (from {len(chunks)})")
@@ -280,14 +287,39 @@ def check_faithfulness_node(state, *, ctx):
     if gr is None:
         return {"faithfulness_report": None, "next_action": "write_report"}
 
-    bullets = [GeneratedBullet(text=b, evidence_ids=list(gr.evidence_refs),
-                source_paths=[state.get("report_path", "")], confidence=0.8)
-               for b in gr.resume_bullets]
-    evidences = [Evidence(evidence_id=ref, chunk_id=ref, source="", content="")
-                 for ref in gr.evidence_refs]
+    # Build real Evidence from retrieved chunks
+    chunks = state.get("retrieved_chunks", [])
+    chunk_map = {}
+    for ev in chunks:
+        cid = ev.chunk_id
+        # Also index by evidence_id
+        chunk_map[ev.evidence_id] = ev
+        chunk_map[cid] = ev
+
+    evidences = []
+    for ref in gr.evidence_refs:
+        cv = chunk_map.get(ref)
+        if cv is not None:
+            evidences.append(Evidence(
+                evidence_id=ref, chunk_id=cv.chunk_id,
+                source=cv.source_path, content=cv.content,
+                confidence=getattr(cv, 'score', 0.5),
+            ))
+        else:
+            evidences.append(Evidence(
+                evidence_id=ref, chunk_id=ref, source="", content="",
+            ))
+
+    bullets = [GeneratedBullet(
+        text=b, evidence_ids=list(gr.evidence_refs),
+        source_paths=[ev.source for ev in evidences if ev.source],
+        confidence=0.8,
+    ) for b in gr.resume_bullets]
 
     report = ctx.faithfulness_checker.check(bullets, evidences)
-    state["logs"].append(f"faithfulness: score={report.faithfulness_score:.2f}, decision={report.decision}")
+    state["logs"].append(f"faithfulness: score={report.faithfulness_score:.2f}, "
+                         f"decision={report.decision}, "
+                         f"unsupported={len(report.unsupported_claims)}")
     return {"faithfulness_report": report, "next_action": "write_report"}
 
 
