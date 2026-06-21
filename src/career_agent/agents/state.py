@@ -1,11 +1,16 @@
 """Shared state models for multi-agent job-match workflow."""
 
+from __future__ import annotations
+
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from career_agent.rag.schemas import RetrievedEvidence
+
+if TYPE_CHECKING:
+    from career_agent.rag.grading import RetrievalGradeReport
 
 
 @dataclass
@@ -57,6 +62,9 @@ class AgentTaskState:
     job_description: str = ""
     parsed_jd: ParsedJD | None = None
     retrieved_evidence: list[RetrievedEvidence] = field(default_factory=list)
+    retrieval_query: str = ""
+    retrieval_grade_report: RetrievalGradeReport | None = None
+    workflow_trace: list[str] = field(default_factory=list)
     match_analysis: MatchAnalysisResult | None = None
     generated_output: GeneratedOutput | None = None
     status: str = "created"

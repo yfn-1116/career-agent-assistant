@@ -1,1 +1,1 @@
-"""RAG data structures and utilities."""
+"""RAG package for profile loading, chunking, retrieval, and grading."""
