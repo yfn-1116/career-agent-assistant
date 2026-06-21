@@ -2,6 +2,32 @@
 
 ## 2026-06-21
 
+### WORKFLOW-002 LangGraph Workflow 迁移
+
+- Executor: Claude Code (接管自 Codex)
+- Type: feature / workflow
+- Summary:
+  - 新增 `src/career_agent/workflows/langgraph_workflow.py`，实现 LangGraph StateGraph。
+  - State 包含 raw_jd, parsed_jd, queries, retrieved_chunks, retrieval_scores, missing_keywords, decision, match_analysis, generated_result, report_path, trace_id, logs, retry_count, next_action。
+  - 7 个节点：parse_jd, rewrite_query, retrieve_context, grade_retrieval, analyze_match, build_output, write_report。
+  - 节点复用现有 Agent/RAG/grading 逻辑，不重写业务代码。
+  - 线性流程，预留 decision/retry_count/next_action 供后续条件边使用。
+  - Demo 新增 `--use-langgraph` 选项。
+  - 保留现有 `JobMatchWorkflow` 不动。
+- Changed files:
+  - `src/career_agent/workflows/langgraph_workflow.py` (NEW)
+  - `demo/cli/run_job_match_demo.py`
+  - `tests/workflows/test_langgraph_workflow.py` (NEW)
+  - `docs/superpowers/tasks/WORKFLOW-002-langgraph-workflow.md`
+  - `documents/97-journal.md`
+- Validation:
+  - `python -m pytest -q` — 287 passed
+  - `python demo/cli/run_job_match_demo.py --use-langgraph` — 4 JD 全部通过
+  - retrieval grading 15 tests 全部通过
+  - 已有 JobMatchWorkflow 11 tests 全部通过
+- Next:
+  - Task 3: demo RAG diagnostics (CLI + Streamlit 展示检索诊断报告)
+
 ### PACKAGING-001 pyproject 与依赖规范化
 
 - Executor: Codex

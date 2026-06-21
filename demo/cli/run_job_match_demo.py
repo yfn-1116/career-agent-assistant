@@ -64,6 +64,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=False,
         help="启用真实语义检索（需设置 QWEN_API_KEY，使用 Qwen Embedding API）",
     )
+    p.add_argument(
+        "--use-langgraph",
+        action="store_true",
+        default=False,
+        help="使用 LangGraph StateGraph workflow（替代默认 Python workflow）",
+    )
     return p
 
 
@@ -206,8 +212,6 @@ def render_report(state, args: argparse.Namespace) -> str:
 def main() -> None:
     _ensure_in_path()
 
-    from career_agent.workflows.job_match_workflow import JobMatchWorkflow
-
     args = build_parser().parse_args()
 
     profile_dir = Path(args.profile_dir)
@@ -224,6 +228,12 @@ def main() -> None:
         sys.exit(1)
 
     job_text = job_file.read_text(encoding="utf-8")
+
+    if args.use_langgraph:
+        _run_langgraph_demo(args, job_text)
+        return
+
+    from career_agent.workflows.job_match_workflow import JobMatchWorkflow
 
     # Build workflow — optionally with LLM
     jd_parser = None
@@ -297,6 +307,97 @@ def main() -> None:
     report = render_report(state, args)
     output_file.write_text(report, encoding="utf-8")
     print(f"输出文件：{output_file}")
+    print("Done.")
+
+
+def _run_langgraph_demo(args: argparse.Namespace, job_text: str) -> None:
+    """Run the LangGraph workflow and print key diagnostics."""
+    from career_agent.agents.build_agent import BuildAgent
+    from career_agent.agents.jd_parser import JDParserAgent
+    from career_agent.agents.match_analysis_agent import MatchAnalysisAgent
+    from career_agent.workflows.langgraph_workflow import run_langgraph_workflow
+
+    # Build optional LLM agents
+    jd_parser = None
+    match_agent = None
+    build_agent = None
+    rag_pipeline = None
+
+    if args.use_llm:
+        if args.model_provider == "qwen":
+            from career_agent.models.qwen_provider import QwenProvider
+            try:
+                provider = QwenProvider()
+                jd_parser = JDParserAgent(model_provider=provider, use_llm=True)
+                match_agent = MatchAnalysisAgent(model_provider=provider, use_llm=True)
+                build_agent = BuildAgent(model_provider=provider, use_llm=True)
+                print(f"🤖 [LangGraph] 已启用 Qwen LLM（model: {provider.model}）")
+            except Exception as e:
+                print(f"⚠️  无法初始化 Qwen：{e}，回退到规则型")
+        else:
+            from career_agent.models.deepseek_provider import DeepSeekProvider
+            try:
+                provider = DeepSeekProvider()
+                jd_parser = JDParserAgent(model_provider=provider, use_llm=True)
+                match_agent = MatchAnalysisAgent(model_provider=provider, use_llm=True)
+                build_agent = BuildAgent(model_provider=provider, use_llm=True)
+                print(f"🤖 [LangGraph] 已启用 DeepSeek LLM（model: {provider.model}）")
+            except Exception as e:
+                print(f"⚠️  无法初始化 DeepSeek：{e}，回退到规则型")
+
+    if args.use_embedding:
+        from career_agent.rag.embeddings.embedding_store import EmbeddingVectorStore
+        from career_agent.rag.embeddings.qwen_embedding import QwenEmbeddingProvider
+        from career_agent.rag.pipeline import RAGPipeline
+        try:
+            emb_provider = QwenEmbeddingProvider()
+            emb_store = EmbeddingVectorStore(emb_provider)
+            rag_pipeline = RAGPipeline(vectorstore=emb_store)
+            print(f"🔍 [LangGraph] 已启用 Qwen Embedding 语义检索（model: {emb_provider.model}）")
+        except Exception as e:
+            print(f"⚠️  无法初始化 Embedding：{e}，回退到关键词检索")
+
+    final_state = run_langgraph_workflow(
+        raw_jd=job_text,
+        top_k=args.top_k,
+        profile_dir=args.profile_dir,
+        output_dir=str(Path(args.output_file).parent),
+        jd_parser=jd_parser,
+        rag_pipeline=rag_pipeline,
+        match_agent=match_agent,
+        build_agent=build_agent,
+    )
+
+    # Print LangGraph diagnostics
+    print(f"Trace ID: {final_state['trace_id']}")
+    print(f"Status: {final_state['status']}")
+
+    pj = final_state["parsed_jd"]
+    if pj is not None:
+        print(f"Parsed JD: title={pj.job_title}, direction={pj.job_direction}")
+
+    queries = final_state.get("queries", [])
+    print(f"Rewritten Queries: {queries}")
+
+    chunks = final_state.get("retrieved_chunks", [])
+    print(f"Retrieved Chunks: {len(chunks)} 条")
+    for ev in chunks:
+        print(f"  - {ev.title or ev.evidence_id} score={ev.score:.2f}")
+
+    rs = final_state.get("retrieval_scores")
+    if rs is not None:
+        print(f"Retrieval Scores: grade={rs.grade}, total={rs.metadata.get('total_score', 0):.2f}")
+    else:
+        print("Retrieval Scores: None")
+
+    print(f"Missing Keywords: {final_state.get('missing_keywords', [])}")
+    print(f"Decision: {final_state['decision']}")
+    print(f"Retry Count: {final_state['retry_count']}")
+    print(f"Report Path: {final_state.get('report_path', '')}")
+
+    if final_state["status"] == "failed":
+        print(f"Error: {final_state.get('error_message', '')}")
+
     print("Done.")
 
 
