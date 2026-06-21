@@ -15,6 +15,8 @@ GRADE_WEAK = "weak"
 GRADE_FAILED = "failed"
 
 AVERAGE_SCORE_PASS_THRESHOLD = 0.35
+MIN_RETRIEVAL_SCORE = 0.0
+MAX_RETRIEVAL_SCORE = 1.0
 KEYWORD_COVERAGE_PASS_THRESHOLD = 0.5
 SOURCE_DIVERSITY_TARGET = 3
 TOTAL_SCORE_FAILED_THRESHOLD = 0.35
@@ -134,7 +136,11 @@ def _has_numeric_score(ev: RetrievedEvidence) -> bool:
         return False
     if not isinstance(ev.score, (int, float)):
         return False
-    return math.isfinite(float(ev.score))
+    score = float(ev.score)
+    return (
+        math.isfinite(score)
+        and MIN_RETRIEVAL_SCORE <= score <= MAX_RETRIEVAL_SCORE
+    )
 
 
 def _keyword_coverage(

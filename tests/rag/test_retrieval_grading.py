@@ -250,6 +250,40 @@ def test_infinite_score_fails_traceability():
     assert not traceability.passed
 
 
+def test_score_above_one_fails_traceability():
+    jd = ParsedJD(hard_skills=["Python"], keywords=["RAG"])
+    ev = _evidence(score=10.0)
+
+    report = grade_retrieval(
+        query="Python RAG",
+        parsed_jd=jd,
+        evidence=[ev],
+        top_k=5,
+    )
+
+    assert report.grade == "failed"
+    traceability = [item for item in report.items if item.name == "traceability"][0]
+    assert not traceability.passed
+    assert report.average_score == 0.0
+
+
+def test_negative_score_fails_traceability():
+    jd = ParsedJD(hard_skills=["Python"], keywords=["RAG"])
+    ev = _evidence(score=-0.1)
+
+    report = grade_retrieval(
+        query="Python RAG",
+        parsed_jd=jd,
+        evidence=[ev],
+        top_k=5,
+    )
+
+    assert report.grade == "failed"
+    traceability = [item for item in report.items if item.name == "traceability"][0]
+    assert not traceability.passed
+    assert report.average_score == 0.0
+
+
 def test_non_numeric_score_fails_traceability():
     jd = ParsedJD(hard_skills=["Python"], keywords=["RAG"])
     ev = _evidence()

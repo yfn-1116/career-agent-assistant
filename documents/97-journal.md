@@ -2,6 +2,24 @@
 
 ## 2026-06-21
 
+### RAG-006 检索评分范围质量修复
+
+- Executor: Codex
+- Type: quality-fix / rag-evaluation
+- Summary:
+  - traceability score 校验新增 0.0 到 1.0 的归一化范围约束。
+  - 超过 1.0 或小于 0.0 的 evidence score 不再计入 average_score，避免抬高总评分。
+- Changed files:
+  - src/career_agent/rag/grading.py
+  - tests/rag/test_retrieval_grading.py
+  - documents/97-journal.md
+- Validation:
+  - PYTHONPATH=src pytest tests/rag/test_retrieval_grading.py::test_score_above_one_fails_traceability -v
+  - PYTHONPATH=src pytest tests/rag/test_retrieval_grading.py -v
+  - PYTHONPATH=src pytest tests/rag -q
+- Next:
+  - 继续按任务卡推进 RAG 诊断展示。
+
 ### RAG-006 检索评分非有限值质量修复
 
 - Executor: Codex
