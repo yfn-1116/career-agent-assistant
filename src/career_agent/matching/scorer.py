@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from career_agent.matching.skill_aliases import expand_skill, normalize_skill
 from career_agent.profile.schema import STATUS_IMPLEMENTED
 
 
@@ -64,29 +65,36 @@ class JobMatchScorer:
         all_required = [s.strip().lower() for s in required_skills if s.strip()]
         all_preferred = [s.strip().lower() for s in preferred_skills if s.strip()]
 
-        # Build skill→evidence mapping from profile items
+        # Build skill→evidence mapping from profile items (with aliases)
         skill_ev: dict[str, list[str]] = {}
+        profile_skill_set: set[str] = set()
         for item in profile_items:
             for skill in item.skills:
-                sk = skill.strip().lower()
+                sk = normalize_skill(skill)
+                profile_skill_set.add(sk)
                 if sk not in skill_ev:
                     skill_ev[sk] = []
                 if item.source_path not in skill_ev[sk]:
                     skill_ev[sk].append(item.source_path)
 
-        # Classify each required skill
+        # Classify each required skill (with alias matching)
         matched, missing, weak = [], [], []
         for sk in all_required:
-            if sk in skill_ev and skill_ev[sk]:
+            canonical = normalize_skill(sk)
+            aliases = expand_skill(sk)
+            alias_set = set(aliases)
+            # Check if any alias matches profile skills
+            found = canonical in profile_skill_set or bool(alias_set & profile_skill_set)
+            if found:
                 has_implemented = any(
                     getattr(item, "status", "") == STATUS_IMPLEMENTED
                     for item in profile_items
-                    if sk in [s.lower() for s in getattr(item, "skills", [])]
+                    if any(normalize_skill(s) in alias_set for s in getattr(item, "skills", []))
                 )
                 if has_implemented:
                     matched.append(sk)
                 else:
-                    weak.append(sk)  # exists but not implemented
+                    weak.append(sk)
             else:
                 missing.append(sk)
 

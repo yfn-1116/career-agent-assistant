@@ -117,10 +117,10 @@ class ProfileLoader:
     def _extract_skills(text: str) -> list[str]:
         """Extract technical skills from text."""
         skills = set()
-        # Match capitalized tech terms and Chinese tech terms
-        for m in re.finditer(
-            r"\b([A-Z][a-zA-Z0-9+#.]{2,}(?:/[A-Z][a-zA-Z0-9+#.]*)?)\b",
-            text,
-        ):
+        # Match CamelCase terms: LangGraph, FastAPI, etc.
+        for m in re.finditer(r"\b([A-Z][a-zA-Z0-9+#.]{2,}(?:/[A-Z][a-zA-Z0-9+#.]*)?)\b", text):
             skills.add(m.group(1))
-        return sorted(skills)[:20]
+        # Match all-caps acronyms: RAG, LLM, FAISS, MCP, API, etc.
+        for m in re.finditer(r"\b([A-Z]{2,}(?:\d+)?)\b", text):
+            skills.add(m.group(1))
+        return sorted(skills)[:25]

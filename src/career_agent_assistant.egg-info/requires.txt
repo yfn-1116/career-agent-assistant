@@ -1,0 +1,14 @@
+langgraph<2.0,>=1.0
+python-dotenv>=1.0
+pyyaml>=6.0
+
+[demo]
+streamlit>=1.30
+
+[dev]
+pytest>=8.0
+pytest-timeout>=2.0
+
+[rag]
+sentence-transformers>=3.0
+pymilvus>=2.4
