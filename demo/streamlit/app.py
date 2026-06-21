@@ -118,21 +118,17 @@ with st.sidebar:
 
     # GitHub
     st.divider()
-    repo = st.text_input("GitHub 仓库", placeholder="用户名/仓库名")
-    if st.button("🔗 读取并导入"):
+    st.header("🔗 GitHub")
+    gh_user = st.text_input("GitHub 用户名", placeholder="yfn-1116")
+    if st.button("📥 读取所有公开仓库"):
+        if gh_user.strip():
+            _fetch_all_repos(gh_user.strip())
+            st.rerun()
+
+    repo = st.text_input("单个仓库", placeholder="用户名/仓库名")
+    if st.button("🔗 读取这个仓库"):
         if repo.strip():
-            import urllib.request
-            try:
-                url = f"https://raw.githubusercontent.com/{repo.strip()}/main/README.md"
-                req = urllib.request.Request(url, headers={"User-Agent": "smart-apply"})
-                with urllib.request.urlopen(req, timeout=10) as r:
-                    content = r.read().decode("utf-8", errors="replace")
-                n = _rag_index(content, f"github:{repo.strip()}")
-                st.session_state.github_repos.append(repo.strip())
-                KB_FILE.with_suffix(".repos.txt").write_text("\n".join(st.session_state.github_repos))
-                st.success(f"✅ {repo} → {n} chunks")
-            except Exception as e:
-                st.error(f"❌ {e}")
+            _fetch_one_repo(repo.strip())
             st.rerun()
 
     # Profile status
@@ -164,15 +160,10 @@ for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# Input
-col1, col2 = st.columns([5, 1])
-with col1:
-    user_input = st.text_area("💬", placeholder="问我任何求职问题，或直接粘贴 JD...", label_visibility="collapsed", height=80)
-with col2:
-    st.write(""); st.write("")
-    send = st.button("🚀 发送", use_container_width=True, type="primary")
+# Input — chat_input 支持 Enter 发送
+user_input = st.chat_input("问我任何求职问题，或粘贴 JD...")
 
-if send and user_input.strip():
+if user_input and user_input.strip():
     st.session_state.messages.append({"role": "user", "content": user_input})
     with st.chat_message("user"): st.markdown(user_input)
 
@@ -262,3 +253,51 @@ else:
             st.markdown(f"**话术**: {app.get('message','')[:200]}")
             st.markdown(f"**简历**: {app.get('resume','')[:200]}")
             st.caption(f"ID: {app['id']} | {app['created_at']}")
+
+def _fetch_one_repo(repo_name):
+    """读取单个 GitHub 仓库 README"""
+    import urllib.request
+    try:
+        url = f"https://raw.githubusercontent.com/{repo_name}/main/README.md"
+        req = urllib.request.Request(url, headers={"User-Agent": "smart-apply"})
+        with urllib.request.urlopen(req, timeout=10) as r:
+            content = r.read().decode("utf-8", errors="replace")
+        n = _rag_index(content, f"github:{repo_name}")
+        if repo_name not in st.session_state.github_repos:
+            st.session_state.github_repos.append(repo_name)
+            KB_FILE.with_suffix(".repos.txt").write_text("\n".join(st.session_state.github_repos))
+        st.success(f"✅ {repo_name} → {n} chunks")
+    except Exception as e:
+        st.error(f"❌ {repo_name}: {e}")
+
+def _fetch_all_repos(username):
+    """读取用户所有公开仓库"""
+    import urllib.request, json
+    try:
+        url = f"https://api.github.com/users/{username}/repos?per_page=100&sort=updated"
+        req = urllib.request.Request(url, headers={"User-Agent": "smart-apply", "Accept": "application/vnd.github.v3+json"})
+        with urllib.request.urlopen(req, timeout=15) as r:
+            repos = json.loads(r.read().decode("utf-8"))
+    except Exception as e:
+        st.error(f"获取仓库列表失败 (API限流，稍后重试): {e}")
+        return
+    count = 0
+    for rd in repos:
+        if rd.get("fork"): continue
+        name = rd["full_name"]
+        desc = rd.get("description", "")
+        lang = rd.get("language", "")
+        stars = rd.get("stargazers_count", 0)
+        content = f"# {name}\n{desc}\n语言:{lang} Stars:{stars}\n"
+        try:
+            rurl = f"https://raw.githubusercontent.com/{name}/main/README.md"
+            req2 = urllib.request.Request(rurl, headers={"User-Agent": "smart-apply"})
+            with urllib.request.urlopen(req2, timeout=8) as r2:
+                content += r2.read().decode("utf-8", errors="replace")
+        except: pass
+        _rag_index(content, f"github:{name}")
+        if name not in st.session_state.github_repos:
+            st.session_state.github_repos.append(name)
+        count += 1
+    KB_FILE.with_suffix(".repos.txt").write_text("\n".join(st.session_state.github_repos))
+    st.success(f"✅ {count} 个仓库 → {st.session_state.kb_chunks} chunks")
