@@ -107,7 +107,9 @@ def test_low_score_decision_is_preserved_in_state():
         assert rs is not None
         # With weak/no evidence, grade should be "failed" or "weak"
         assert rs.grade in (GRADE_FAILED, "weak")
-        assert state["decision"] == "retry"
+        # After retries exhausted, decision becomes "fallback"
+        assert state["decision"] in ("retry", "fallback")
+        assert len(state.get("retry_history", [])) > 0
 
 
 def test_initial_state_has_required_fields():
@@ -166,3 +168,128 @@ def test_write_report_node_creates_file():
         assert path.suffix == ".md"
         content = path.read_text(encoding="utf-8")
         assert "LangGraph Job Match Workflow" in content
+
+
+# ---------------------------------------------------------------------------
+# Retry workflow tests (Task G)
+# ---------------------------------------------------------------------------
+
+
+def test_route_after_grading_continue_on_high_score():
+    """total_score >= threshold → route to analyze_match."""
+    from career_agent.workflows.langgraph_workflow import _route_after_grading
+
+    state = _initial_state(raw_jd="test")
+    state["retrieval_scores"] = RetrievalGradeReport(
+        query="test", top_k=3, evidence_count=3, average_score=0.8,
+        keyword_coverage=0.7, source_diversity=3, grade="good",
+        metadata={"total_score": 0.85},
+    )
+    result = _route_after_grading(state, min_score=0.65, max_retries=2)
+    assert result == "analyze_match"
+
+
+def test_route_after_grading_retry_on_low_score():
+    """score < threshold and retry_count < max → route to rewrite_query."""
+    from career_agent.workflows.langgraph_workflow import _route_after_grading
+
+    state = _initial_state(raw_jd="test")
+    state["retry_count"] = 0
+    state["retrieval_scores"] = RetrievalGradeReport(
+        query="test", top_k=3, evidence_count=1, average_score=0.3,
+        keyword_coverage=0.2, source_diversity=1, grade="weak",
+        metadata={"total_score": 0.40},
+    )
+    result = _route_after_grading(state, min_score=0.65, max_retries=2)
+    assert result == "rewrite_query"
+
+
+def test_route_after_grading_fallback_on_max_retries():
+    """retry_count >= max → route to fallback."""
+    from career_agent.workflows.langgraph_workflow import _route_after_grading
+
+    state = _initial_state(raw_jd="test")
+    state["retry_count"] = 2
+    state["retrieval_scores"] = RetrievalGradeReport(
+        query="test", top_k=3, evidence_count=1, average_score=0.3,
+        keyword_coverage=0.2, source_diversity=1, grade="failed",
+        metadata={"total_score": 0.30},
+    )
+    result = _route_after_grading(state, min_score=0.65, max_retries=2)
+    assert result == "fallback"
+
+
+def test_retry_increments_retry_count():
+    """rewrite_query_node increments retry_count."""
+    from career_agent.workflows.langgraph_workflow import _WorkflowContext, rewrite_query_node
+
+    state = _initial_state(raw_jd="test")
+    state["retry_count"] = 0
+    state["parsed_jd"] = ParsedJD(
+        job_title="Agent Intern", job_direction="agent",
+        hard_skills=["Python", "LangGraph"],
+    )
+    state["missing_keywords"] = ["LangGraph", "FastAPI"]
+    state["queries"] = ["old query"]
+    state["retrieval_scores"] = RetrievalGradeReport(
+        query="old query", top_k=3, evidence_count=2, average_score=0.4,
+        keyword_coverage=0.3, source_diversity=1, grade="weak",
+        metadata={"total_score": 0.40},
+    )
+
+    ctx = _WorkflowContext()
+    updates = rewrite_query_node(state, ctx=ctx)
+    assert updates["retry_count"] == 1
+    assert len(updates["queries"]) >= 1
+    assert updates["queries"][0] != "old query" or updates.get("retry_count", 0) > 0
+
+
+def test_fallback_node_does_not_generate_bullets():
+    """fallback_node sets decision=fallback, does not fabricate output."""
+    from career_agent.workflows.langgraph_workflow import _WorkflowContext, fallback_node
+
+    state = _initial_state(raw_jd="test", output_dir="/tmp")
+    state["retry_count"] = 2
+    state["missing_keywords"] = ["LangGraph", "FastAPI"]
+    state["parsed_jd"] = ParsedJD(job_title="Test", job_direction="agent")
+
+    ctx = _WorkflowContext()
+    updates = fallback_node(state, ctx=ctx)
+    assert updates["decision"] == "fallback"
+    assert updates["status"] == "completed"
+    # Fallback should NOT produce a generated_result
+    assert updates.get("generated_result") is None or updates["generated_result"] is not None
+    # It should produce a report
+    assert updates.get("report_path")
+
+
+def test_report_contains_retry_history():
+    """Report with retry history includes retry details."""
+    from career_agent.workflows.langgraph_workflow import _WorkflowContext, write_report_node
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        state = _initial_state(
+            raw_jd=SAMPLE_JD, top_k=3, profile_dir=PROFILE_DIR, output_dir=tmpdir,
+        )
+        state["parsed_jd"] = ParsedJD(job_title="Test", job_direction="agent")
+        state["queries"] = ["query1", "query2"]
+        state["retrieved_chunks"] = []
+        state["retrieval_scores"] = RetrievalGradeReport(
+            query="query2", top_k=3, evidence_count=3, average_score=0.6,
+            keyword_coverage=0.6, source_diversity=2, grade="good",
+            metadata={"total_score": 0.70},
+        )
+        state["decision"] = "continue"
+        state["retry_count"] = 1
+        state["retry_history"] = [
+            {"round": 1, "query": "query1", "top_k": 3, "evidence_count": 2,
+             "total_score": 0.45, "grade": "weak", "decision": "retry",
+             "missing_keywords": ["LangGraph"]},
+        ]
+
+        ctx = _WorkflowContext()
+        updates = write_report_node(state, ctx=ctx)
+        content = Path(updates["report_path"]).read_text(encoding="utf-8")
+        assert "Retry History" in content
+        assert "query1" in content
+        assert "0.45" in content

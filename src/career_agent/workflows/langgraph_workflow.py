@@ -1,12 +1,28 @@
-"""LangGraph-based job match workflow.
+"""LangGraph-based job match workflow with conditional retry.
 
 Migrates the existing ``JobMatchWorkflow`` to a LangGraph ``StateGraph``
 while reusing all existing agent / service logic without rewriting it.
 
-Node order (linear, this task)::
+Node order with conditional branching::
 
     parse_jd -> rewrite_query -> retrieve_context -> grade_retrieval
-    -> analyze_match -> build_output -> write_report -> END
+      ^                                                  │
+      │            (retry: score < threshold)            │
+      └──────────────────────────────────────────────────┤
+                                                         │
+                          (pass: score >= threshold)     │
+                                                         ▼
+                                                   analyze_match
+                                                         │
+                                                         ▼
+                                                   build_output
+                                                         │
+                                                         ▼
+                                                   write_report
+                                                         │
+    fallback (max retries)                                │
+      │                                                   │
+      └──► END ◄──────────────────────────────────────────┘
 """
 
 from __future__ import annotations
@@ -31,6 +47,10 @@ from career_agent.rag.grading import GRADE_FAILED, RetrievalGradeReport, grade_r
 from career_agent.rag.pipeline import RAGPipeline
 from career_agent.rag.schemas import RetrievedEvidence
 
+# Default thresholds — overridable via settings
+DEFAULT_MIN_RETRIEVAL_SCORE = 0.65
+DEFAULT_MAX_RETRIES = 2
+
 
 # ---------------------------------------------------------------------------
 # State
@@ -53,6 +73,10 @@ class JobMatchState(TypedDict):
     trace_id: str
     logs: list[str]
     retry_count: int
+    max_retries: int
+    retry_history: list[dict[str, Any]]
+    query_rewrite_reason: str
+    fallback_reason: str
     next_action: str
     top_k: int
     profile_dir: str
@@ -67,6 +91,7 @@ def _initial_state(
     top_k: int = 5,
     profile_dir: str = "",
     output_dir: str = "",
+    max_retries: int = DEFAULT_MAX_RETRIES,
 ) -> JobMatchState:
     return JobMatchState(
         raw_jd=raw_jd,
@@ -82,6 +107,10 @@ def _initial_state(
         trace_id=uuid.uuid4().hex[:12],
         logs=[],
         retry_count=0,
+        max_retries=max_retries,
+        retry_history=[],
+        query_rewrite_reason="",
+        fallback_reason="",
         next_action="parse_jd",
         top_k=top_k,
         profile_dir=profile_dir,
@@ -134,10 +163,43 @@ def rewrite_query_node(state: JobMatchState, *, ctx: _WorkflowContext) -> dict[s
     pj = state["parsed_jd"]
     if pj is None:
         state["logs"].append("rewrite_query: parsed_jd is None, skipping")
-        return {"queries": [], "next_action": "retrieve_context"}
+        return {"queries": [], "next_action": "retrieve_context", "retry_count": state.get("retry_count", 0)}
+
+    retry_count = state.get("retry_count", 0)
     query = ctx.rag_retriever.build_query_from_parsed_jd(pj)
-    state["logs"].append(f"rewrite_query: query='{query[:120]}'")
-    return {"queries": [query], "next_action": "retrieve_context"}
+
+    # If retrying, enhance query with missing keywords and rewrite reason
+    missing = state.get("missing_keywords", [])
+    prev_queries = state.get("queries", [])
+    prev_scores = state.get("retrieval_scores")
+
+    if retry_count > 0 and missing:
+        reason_parts = [f"retry #{retry_count}"]
+        # Focus on top missing keywords
+        focus_keywords = missing[:5]
+        reason_parts.append(f"missing: {', '.join(focus_keywords)}")
+        if prev_scores is not None:
+            reason_parts.append(f"prev_grade={prev_scores.grade}")
+
+        rewrite_reason = "; ".join(reason_parts)
+        # Build a more targeted query for the missing skills
+        alt_query = " ".join(focus_keywords)
+        query = f"{query} {' '.join(focus_keywords)}"
+
+        state["logs"].append(
+            f"rewrite_query: retry #{retry_count}, "
+            f"missing_keywords={focus_keywords}, "
+            f"new_query='{query[:120]}'"
+        )
+    else:
+        rewrite_reason = "initial query from parsed JD"
+
+    return {
+        "queries": [query],
+        "retry_count": retry_count + 1,
+        "query_rewrite_reason": rewrite_reason,
+        "next_action": "retrieve_context",
+    }
 
 
 def retrieve_context_node(state: JobMatchState, *, ctx: _WorkflowContext) -> dict[str, Any]:
@@ -158,9 +220,10 @@ def retrieve_context_node(state: JobMatchState, *, ctx: _WorkflowContext) -> dic
 def grade_retrieval_node(state: JobMatchState, *, ctx: _WorkflowContext) -> dict[str, Any]:  # noqa: ARG001
     _log(state, "grade_retrieval_node")
     queries = state.get("queries", [])
-    query = queries[0] if queries else ""
+    query = queries[-1] if queries else ""
     chunks = state.get("retrieved_chunks", [])
     top_k = state["top_k"]
+    retry_count = state.get("retry_count", 0)
 
     report = grade_retrieval(
         query=query,
@@ -169,13 +232,28 @@ def grade_retrieval_node(state: JobMatchState, *, ctx: _WorkflowContext) -> dict
         top_k=top_k,
     )
 
-    # Collect missing keywords
     missing = _collect_missing_keywords(report, state["parsed_jd"])
-    decision = _decide_from_grade(report)
+    total_score = report.metadata.get("total_score", 0)
+    decision = _decide_from_grade(report, total_score, retry_count, state.get("max_retries", DEFAULT_MAX_RETRIES))
+
+    # Record retry history
+    history_entry = {
+        "round": retry_count if retry_count > 0 else 1,
+        "query": query,
+        "top_k": top_k,
+        "evidence_count": report.evidence_count,
+        "total_score": total_score,
+        "grade": report.grade,
+        "decision": decision,
+        "missing_keywords": list(missing),
+    }
+    history = list(state.get("retry_history", []))
+    history.append(history_entry)
 
     state["logs"].append(
-        f"grade_retrieval: grade={report.grade}, "
-        f"score={report.metadata.get('total_score', 0):.2f}, "
+        f"grade_retrieval: round={history_entry['round']}, "
+        f"grade={report.grade}, "
+        f"score={total_score:.2f}, "
         f"coverage={report.keyword_coverage:.2f}, "
         f"decision={decision}"
     )
@@ -184,7 +262,8 @@ def grade_retrieval_node(state: JobMatchState, *, ctx: _WorkflowContext) -> dict
         "retrieval_scores": report,
         "missing_keywords": missing,
         "decision": decision,
-        "next_action": "analyze_match",
+        "retry_history": history,
+        "next_action": decision,
     }
 
 
@@ -258,12 +337,93 @@ def _collect_missing_keywords(
     return sorted(expected - all_matched)
 
 
-def _decide_from_grade(report: RetrievalGradeReport) -> str:
+def _decide_from_grade(
+    report: RetrievalGradeReport,
+    total_score: float = 0.0,
+    retry_count: int = 0,
+    max_retries: int = DEFAULT_MAX_RETRIES,
+) -> str:
+    if retry_count >= max_retries:
+        return "fallback"
+    if total_score >= DEFAULT_MIN_RETRIEVAL_SCORE:
+        return "continue"
     if report.grade == GRADE_FAILED:
         return "retry"
     if report.grade == "weak":
-        return "retry"  # reserved for future retry loop
+        return "retry"
     return "continue"
+
+
+def _route_after_grading(
+    state: JobMatchState,
+    min_score: float = DEFAULT_MIN_RETRIEVAL_SCORE,
+    max_retries: int = DEFAULT_MAX_RETRIES,
+) -> str:
+    """Conditional edge: decide next node after grading."""
+    decision = state.get("decision", "continue")
+    if decision == "fallback":
+        return "fallback"
+    if decision == "retry":
+        return "rewrite_query"
+    # Check score threshold for explicit continue
+    rs = state.get("retrieval_scores")
+    if rs is not None:
+        total = rs.metadata.get("total_score", 0)
+        retry_count = state.get("retry_count", 0)
+        if total < min_score and retry_count < max_retries:
+            return "rewrite_query"
+        if retry_count >= max_retries and total < min_score:
+            return "fallback"
+    return "analyze_match"
+
+
+def fallback_node(state: JobMatchState, *, ctx: _WorkflowContext) -> dict[str, Any]:  # noqa: ARG001
+    """Handle exhausted retries — produce a safe report without fabrication."""
+    _log(state, "fallback_node")
+    missing = state.get("missing_keywords", [])
+    history = state.get("retry_history", [])
+
+    reason = (
+        f"经过 {state.get('retry_count', 0)} 轮检索（最多 {state.get('max_retries', DEFAULT_MAX_RETRIES)} 轮），"
+        f"检索质量未达到阈值 {DEFAULT_MIN_RETRIEVAL_SCORE}。"
+    )
+    if missing:
+        reason += f" 未覆盖技能：{', '.join(missing[:10])}。"
+
+    state["logs"].append(
+        f"fallback: retries={state.get('retry_count', 0)}, "
+        f"missing={len(missing)} keywords, reason={reason[:120]}"
+    )
+
+    # Write a fallback report
+    output_dir = Path(state["output_dir"]) if state["output_dir"] else Path("outputs/demo")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    report_path = output_dir / f"langgraph_fallback_{state['trace_id']}.md"
+    report_lines = [
+        "# LangGraph — 检索未达标（Fallback）",
+        "",
+        f"- Trace ID: `{state['trace_id']}`",
+        f"- Reason: {reason}",
+        f"- Retry History: {len(history)} rounds",
+        "",
+        "## 建议",
+        "当前用户资料库可能不足以覆盖该岗位的核心技能要求。",
+        "建议补充以下材料：",
+        "",
+    ]
+    for kw in missing[:10]:
+        report_lines.append(f"- {kw} 相关项目经历或技能说明")
+    report_lines.append("")
+    report_lines.append("补充资料后重新运行即可获得更准确的匹配分析。")
+    report_path.write_text("\n".join(report_lines), encoding="utf-8")
+
+    return {
+        "decision": "fallback",
+        "fallback_reason": reason,
+        "report_path": str(report_path),
+        "status": "completed",
+        "next_action": "end",
+    }
 
 
 def _render_langgraph_report(state: JobMatchState) -> str:
@@ -336,9 +496,38 @@ def _render_langgraph_report(state: JobMatchState) -> str:
     L(f"**{state.get('decision', 'N/A')}**")
     L("")
 
+    # --- Retry History ---
+    rh = state.get("retry_history", [])
+    if rh:
+        L("## 7. Retry History")
+        L("")
+        L("| Round | Query | Top-K | Evidence | Score | Grade | Decision |")
+        L("|-------|-------|-------|----------|-------|-------|----------|")
+        for entry in rh:
+            L(
+                f"| {entry.get('round', '?')} "
+                f"| `{str(entry.get('query', ''))[:60]}` "
+                f"| {entry.get('top_k', '?')} "
+                f"| {entry.get('evidence_count', '?')} "
+                f"| {entry.get('total_score', 0):.2f} "
+                f"| {entry.get('grade', '?')} "
+                f"| {entry.get('decision', '?')} |"
+            )
+        L("")
+
+    # --- Fallback reason ---
+    fr = state.get("fallback_reason", "")
+    if fr:
+        L("## 8. Fallback Reason")
+        L(fr)
+        L("")
+
     # --- Match Analysis ---
+    section_offset = 8 if fr else (7 if rh else 6)
+    section_offset += 1
     ma = state.get("match_analysis")
-    L("## 7. Match Analysis")
+    L(f"## {section_offset}. Match Analysis")
+    section_offset += 1
     if ma is not None:
         L("### Strengths")
         for s in ma.strengths:
@@ -355,7 +544,8 @@ def _render_langgraph_report(state: JobMatchState) -> str:
 
     # --- Generated Result ---
     gr = state.get("generated_result")
-    L("## 8. Generated Result")
+    L(f"## {section_offset}. Generated Result")
+    section_offset += 1
     if gr is not None:
         L("### Resume Bullets")
         for b in gr.resume_bullets:
@@ -369,12 +559,13 @@ def _render_langgraph_report(state: JobMatchState) -> str:
     L("")
 
     # --- Logs ---
-    L("## 9. Execution Logs")
+    L(f"## {section_offset}. Execution Logs")
+    section_offset += 1
     for log_entry in state.get("logs", []):
         L(f"- {log_entry}")
     L("")
 
-    L("## 10. Report Path")
+    L(f"## {section_offset}. Report Path")
     L(f"`{state.get('report_path', '')}`")
 
     return "\n".join(lines)
@@ -415,16 +606,36 @@ def create_langgraph_workflow(
     graph.add_node("analyze_match", lambda s: analyze_match_node(s, ctx=ctx))
     graph.add_node("build_output", lambda s: build_output_node(s, ctx=ctx))
     graph.add_node("write_report", lambda s: write_report_node(s, ctx=ctx))
+    graph.add_node("fallback", lambda s: fallback_node(s, ctx=ctx))
 
-    # Linear edges
+    # Linear edges for initial flow
     graph.add_edge(START, "parse_jd")
     graph.add_edge("parse_jd", "rewrite_query")
     graph.add_edge("rewrite_query", "retrieve_context")
     graph.add_edge("retrieve_context", "grade_retrieval")
-    graph.add_edge("grade_retrieval", "analyze_match")
+
+    # Conditional edge: grade → analyze OR retry → rewrite_query OR fallback
+    graph.add_conditional_edges(
+        "grade_retrieval",
+        lambda s: _route_after_grading(
+            s,
+            min_score=DEFAULT_MIN_RETRIEVAL_SCORE,
+            max_retries=DEFAULT_MAX_RETRIES,
+        ),
+        {
+            "analyze_match": "analyze_match",
+            "rewrite_query": "rewrite_query",
+            "fallback": "fallback",
+        },
+    )
+
+    # analyze → build → write → END
     graph.add_edge("analyze_match", "build_output")
     graph.add_edge("build_output", "write_report")
     graph.add_edge("write_report", END)
+
+    # fallback → END (no generation)
+    graph.add_edge("fallback", END)
 
     return graph.compile()
 
