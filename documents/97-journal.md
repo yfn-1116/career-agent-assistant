@@ -2,6 +2,27 @@
 
 ## 2026-06-21
 
+### RAG-006 检索关键词覆盖质量修复
+
+- Executor: Codex
+- Type: quality-fix / rag-evaluation
+- Summary:
+  - 修复 keyword_coverage 对 evidence content 的原始子串匹配问题，避免 Go 误命中 Django。
+  - matched_keywords 改为标准化后精确匹配，content 改为 term boundary 匹配。
+  - 用行为边界测试替换常量快照测试，并固定代表性 good / excellent 评分用例。
+  - 补充 RAG 评估文档中的 RetrievalGradeReport 单次诊断指标表。
+- Changed files:
+  - src/career_agent/rag/grading.py
+  - tests/rag/test_retrieval_grading.py
+  - documents/05-evaluation/01-rag-evaluation.md
+  - documents/97-journal.md
+- Validation:
+  - PYTHONPATH=src pytest tests/rag/test_retrieval_grading.py::test_keyword_coverage_does_not_match_inside_longer_word -v
+  - PYTHONPATH=src pytest tests/rag/test_retrieval_grading.py -v
+  - PYTHONPATH=src pytest tests/rag -q
+- Next:
+  - 继续按任务卡推进后续 RAG 诊断展示。
+
 ### RAG-006 检索评分与诊断报告合规修复
 
 - Executor: Codex

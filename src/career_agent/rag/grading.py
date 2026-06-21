@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -139,15 +140,32 @@ def _keyword_coverage(
         return 0.0
 
     expected = set(parsed_jd.hard_skills + parsed_jd.bonus_skills + parsed_jd.keywords)
-    expected = {kw.lower() for kw in expected if kw}
+    expected = {_normalize_keyword(kw) for kw in expected if _normalize_keyword(kw)}
     if not expected:
         return 0.0
 
-    evidence_text = " ".join(
-        [" ".join(ev.matched_keywords) + " " + ev.content for ev in evidence]
-    ).lower()
-    matched = {kw for kw in expected if kw.lower() in evidence_text}
+    matched_keywords = {
+        _normalize_keyword(kw)
+        for ev in evidence
+        for kw in ev.matched_keywords
+        if _normalize_keyword(kw)
+    }
+    evidence_text = _normalize_keyword(" ".join(ev.content for ev in evidence))
+
+    matched = {
+        kw
+        for kw in expected
+        if kw in matched_keywords or _contains_term(evidence_text, kw)
+    }
     return round(len(matched) / len(expected), 4)
+
+
+def _normalize_keyword(value: str) -> str:
+    return re.sub(r"\s+", " ", value.strip().lower())
+
+
+def _contains_term(text: str, term: str) -> bool:
+    return re.search(rf"(?<!\w){re.escape(term)}(?!\w)", text) is not None
 
 
 def _grade_from_score(total_score: float, evidence_count: int, traceable: bool) -> str:
