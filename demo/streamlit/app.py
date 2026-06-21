@@ -10,18 +10,51 @@ import streamlit as st
 
 st.set_page_config(page_title="求职投递管家", page_icon="🤖", layout="wide")
 
-# ---- Session Init ----
+# ---- Session Init (persistent across refreshes) ----
 for k, v in {
-    "messages": [], "kb_chunks": 0, "github_repos": [],
-    "profile_summary": "", "applications": [],
+    "messages": [], "profile_summary": "", "applications": [],
 }.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
+# 持久化知识库：从磁盘恢复
+KB_FILE = Path("data/knowledge_base/chunks.jsonl")
+KB_FILE.parent.mkdir(parents=True, exist_ok=True)
+if "kb_chunks" not in st.session_state:
+    st.session_state.kb_chunks = 0
+if "github_repos" not in st.session_state:
+    saved_repos = []
+    if KB_FILE.with_suffix(".repos.txt").exists():
+        saved_repos = KB_FILE.with_suffix(".repos.txt").read_text().strip().split("\n")
+        saved_repos = [r for r in saved_repos if r]
+    st.session_state.github_repos = saved_repos
+if "kw_store" not in st.session_state:
+    from career_agent.rag.vectorstores.memory_store import MemoryVectorStore
+    st.session_state["kw_store"] = MemoryVectorStore()
+    # 从磁盘恢复 chunks
+    if KB_FILE.exists():
+        from career_agent.rag.schemas import DocumentChunk
+        count = 0
+        with open(KB_FILE) as f:
+            for line in f:
+                if line.strip():
+                    try:
+                        d = __import__("json").loads(line)
+                        st.session_state["kw_store"].add_chunks([DocumentChunk(
+                            chunk_id=d["chunk_id"], document_id=d.get("document_id",""),
+                            content=d["content"], source_path=d.get("source_path",""),
+                            chunk_index=d.get("chunk_index",0),
+                            metadata=d.get("metadata",{})
+                        )])
+                        count += 1
+                    except Exception:
+                        pass
+        st.session_state.kb_chunks = count
+
 # ---- Helpers ----
 def _rag_index(content, source_name="upload"):
-    """将文本导入 RAG 知识库"""
-    import hashlib
+    """将文本导入 RAG 知识库，并持久化到磁盘"""
+    import hashlib, json
     from career_agent.rag.schemas import ProfileDocument
     from career_agent.rag.chunking.text_chunker import TextChunker
     from career_agent.rag.vectorstores.memory_store import MemoryVectorStore
@@ -31,7 +64,13 @@ def _rag_index(content, source_name="upload"):
     if "kw_store" not in st.session_state:
         st.session_state["kw_store"] = MemoryVectorStore()
     st.session_state["kw_store"].add_chunks(chunks)
+    # 持久化到磁盘
+    with open(KB_FILE, "a") as f:
+        for c in chunks:
+            f.write(json.dumps({"chunk_id":c.chunk_id,"document_id":c.document_id,"content":c.content,"source_path":c.source_path,"chunk_index":c.chunk_index,"metadata":c.metadata}, ensure_ascii=False)+"\n")
     st.session_state.kb_chunks += len(chunks)
+    # 保存 GitHub repos 列表
+    KB_FILE.with_suffix(".repos.txt").write_text("\n".join(st.session_state.github_repos))
     return len(chunks)
 
 def _llm(prompt, system="你是专业的求职顾问助手"):
@@ -90,6 +129,7 @@ with st.sidebar:
                     content = r.read().decode("utf-8", errors="replace")
                 n = _rag_index(content, f"github:{repo.strip()}")
                 st.session_state.github_repos.append(repo.strip())
+                KB_FILE.with_suffix(".repos.txt").write_text("\n".join(st.session_state.github_repos))
                 st.success(f"✅ {repo} → {n} chunks")
             except Exception as e:
                 st.error(f"❌ {e}")
