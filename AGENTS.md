@@ -31,7 +31,7 @@
 
 ## 当前状态
 
-当前仓库处于 Phase 0：文档体系与 AI 协作规范初始化阶段。业务代码、RAG、Agent workflow、前端页面和部署脚本尚未实现。
+当前仓库处于 Phase 2：稳定可演示、结构清晰、文档一致的 Internship Copilot / 实习求职投递管家 Agent 原型整理阶段。RAG、核心 Agent、Python workflow、LangGraph workflow、CLI、Streamlit、FastAPI Browser API、Chrome Browser Extension、评估与运行手册均已有实现；后续执行任务应优先保持演示稳定、数据边界清晰、证据约束可信，不引入自动投递或自动发送消息能力。
 
 ## 后续维护规则
 

@@ -1,5 +1,34 @@
 # 项目日志
 
+## 2026-06-22
+
+### DATA-001 / DOC-SYNC-002 运行数据边界与 Phase 2 文档同步
+
+- Executor: Codex
+- Type: chore / docs
+- Summary:
+  - 将本地生成的知识库索引、上传简历和投递记录识别为运行产物，保留在本地 ignored 路径，不作为可提交样例数据。
+  - 更新 `.gitignore`，默认忽略 `runtime/`、`.local/`、上传文件、投递记录、知识库索引、生成 PDF、diagnostics、日志和临时文件。
+  - 新增 `data/samples/README.md`，明确 `data/samples/` 只放脱敏样例，真实运行数据放 `runtime/` 或 `outputs/`。
+  - 从 Git 跟踪中移除 `data/knowledge_base/chunks.jsonl`，避免提交真实简历内容或个人信息派生的 chunks。
+  - 同步 README、项目总览、规划、运行手册和 AGENTS 当前状态，统一为 Phase 2 Internship Copilot / 实习求职投递管家 Agent 原型。
+  - 在 README 和 overview 中补充演示边界：不自动投递、不自动发送 HR 消息、不自动爬取招聘平台，浏览器插件只辅助提取和生成内容。
+- Changed files:
+  - `.gitignore`
+  - `data/samples/README.md`
+  - `data/knowledge_base/chunks.jsonl` (removed from Git tracking)
+  - `README.md`
+  - `documents/00-project-overview.md`
+  - `documents/99-project-planning.md`
+  - `documents/98-runbook/README.md`
+  - `AGENTS.md`
+  - `documents/97-journal.md`
+- Validation:
+  - `git diff --cached --check` — Phase 1 commit clean before commit.
+  - Full test suite will run after code refactor and evidence-gate phases.
+- Next:
+  - Continue with Streamlit thin-UI extraction and AgentRunService entrypoint consolidation.
+
 ## 2026-06-21
 
 ### DEMO-003 RAG 检索诊断展示

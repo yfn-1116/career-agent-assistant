@@ -2,11 +2,11 @@
 
 ## 当前阶段
 
-Phase 2：LangGraph 与标准 RAG 可观测性增强
+Phase 2：稳定可演示的 Internship Copilot 原型整理
 
 ## 阶段目标
 
-在已完成 MVP 的基础上，引入 LangGraph workflow、标准化 RAG 检索诊断、CLI/Streamlit 可视化报告和 Python 依赖规范化。
+在已完成 MVP、LangGraph workflow、RAG 检索诊断、CLI / Streamlit / FastAPI / Browser Extension demo 的基础上，整理运行数据边界、统一文档阶段描述、收敛 Streamlit 职责、强化 `AgentRunService` 统一入口，并加深 Evidence Gate / Faithfulness 对最终输出的约束。
 
 ## 任务状态说明
 
@@ -43,10 +43,16 @@ Phase 2：LangGraph 与标准 RAG 可观测性增强
 | DEMO | DEMO-001 | CLI demo | Claude Code + DeepSeek | DONE | CLI + Markdown 报告，10 smoke tests |
 | DEMO | DEMO-002 | Streamlit demo | Claude Code + DeepSeek | DONE | 轻量可视化，15 static tests |
 | DEPLOY | DEPLOY-001 | 学校服务器部署文档 | Claude Code + DeepSeek | DONE | CLI+Streamlit 部署，checklist |
-| WORKFLOW | WORKFLOW-002 | LangGraph workflow 集成 | Codex | NEXT | 已完成 spec 与任务卡，等待实现 |
+| WORKFLOW | WORKFLOW-002 | LangGraph workflow 集成 | Codex | DONE | LangGraph StateGraph 已实现，保留 Python workflow 兼容 |
 | RAG | RAG-006 | 检索评分与诊断报告 | Codex | DONE | RetrievalGradeReport 已实现，规则型评分 |
-| DEMO | DEMO-003 | RAG 检索诊断展示 | Claude Code + DeepSeek | TODO | CLI + Streamlit 展示 query/grade/evidence |
+| DEMO | DEMO-003 | RAG 检索诊断展示 | Claude Code + DeepSeek | DONE | CLI + Streamlit 展示 query/grade/evidence |
 | PACKAGING | PACKAGING-001 | pyproject 与依赖规范化 | Codex | DONE | pyproject + langgraph dependency |
+| CHORE | DATA-001 | 运行产物与数据边界隔离 | Codex | DONE | runtime/output/upload/application/knowledge-base index 默认不提交 |
+| DOC | DOC-SYNC-002 | Phase 2 项目状态文档同步 | Codex | IN_PROGRESS | README / overview / planning / journal / AGENTS 同步 |
+| REFACTOR | STREAMLIT-001 | Streamlit demo 薄 UI 拆分 | Codex | NEXT | 上传、知识库、投递记录、聊天逻辑迁出到 service/repository |
+| SERVICE | SERVICE-001 | AgentRunService 统一入口收敛 | Codex | NEXT | UI/API/CLI 尽量通过 service 调用核心能力 |
+| EVIDENCE | EVIDENCE-001 | 最终输出证据约束增强 | Codex | NEXT | warnings / approval_required / 可写与需确认内容 |
+| TEST | E2E-001 | 演示链路端到端测试补强 | Codex | NEXT | AgentRunService / Browser API / Streamlit service / CLI |
 
 ## 建议任务顺序
 
@@ -68,10 +74,16 @@ Phase 2：LangGraph 与标准 RAG 可观测性增强
 16. DEMO-001 CLI demo。
 17. DEMO-002 Streamlit demo。
 18. DEPLOY-001 学校服务器部署文档。
-19. WORKFLOW-002 LangGraph workflow 集成。← 下一步，Codex
+19. ~~WORKFLOW-002 LangGraph workflow 集成。~~ ✅
 20. RAG-006 检索评分与诊断报告。
-21. DEMO-003 RAG 检索诊断展示。
+21. ~~DEMO-003 RAG 检索诊断展示。~~ ✅
 22. PACKAGING-001 pyproject 与依赖规范化。
+23. DATA-001 运行产物与数据边界隔离。
+24. DOC-SYNC-002 Phase 2 项目状态文档同步。
+25. STREAMLIT-001 Streamlit demo 薄 UI 拆分。← 当前优先
+26. SERVICE-001 AgentRunService 统一入口收敛。
+27. EVIDENCE-001 最终输出证据约束增强。
+28. E2E-001 演示链路端到端测试补强。
 
 ## 分工建议
 

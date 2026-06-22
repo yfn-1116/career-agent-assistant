@@ -13,4 +13,4 @@
 
 ## 适用阶段
 
-当前为 Phase 1（CLI Demo），所有说明基于现有 CLI demo。后续 Streamlit demo 完成后会补充相关文档。
+当前为 Phase 2（Internship Copilot 原型整理）。运行手册覆盖 CLI demo、Streamlit demo、学校服务器展示和本地问题排查；FastAPI / Browser Extension 的使用说明见 `docs/runbooks/browser_assistant_usage.md`。

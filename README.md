@@ -1,10 +1,10 @@
-# Evidence-grounded Job Matching Agent
+# Internship Copilot / 实习求职投递管家 Agent
 
-基于证据约束的智能求职匹配 Agent。
+面向大学生实习求职场景的证据约束型 Internship Copilot 原型。
 
 ## 项目定位
 
-**不是**：GPT 包装壳、简历生成器、自动投递机器人、一次性 JD 分析工具。
+**不是**：GPT 包装壳、自动投递机器人、招聘平台爬虫、一次性 JD 分析工具。
 
 **是**：
 - 维护用户**长期求职资料库**，区分"已实现/设计/计划/证据不足"；
@@ -12,7 +12,8 @@
 - **Evidence Gate** 阻止把"设计了"写成"实现了"，阻止编造经历；
 - 输出**可追溯 diagnostics 和 report**；
 - **长期追踪能力缺口**，告诉用户该补什么项目；
-- **批量岗位匹配和投递记录**。
+- **批量岗位匹配和投递记录**；
+- 通过 **CLI / Streamlit / FastAPI / Browser Extension** 演示完整求职辅助链路。
 
 ## 核心能力
 
@@ -28,8 +29,9 @@
 | Capability Gap | 跨岗位技能缺口分析 |
 | Faithfulness | 生成内容忠实度检查 |
 | Diagnostics | JSON + Markdown 全链路可观测 |
+| AgentRunService | UI / API / CLI 调用核心 Agent 能力的统一服务入口 |
 
-第一阶段跑通以下链路：
+当前已跑通以下演示链路：
 
 ```text
 本地用户资料 Markdown
@@ -37,10 +39,18 @@
 → JD 解析
 → 匹配分析
 → 简历项目描述 / 沟通话术生成
-→ CLI / Streamlit 展示
+→ CLI / Streamlit / FastAPI / Browser Extension 展示
 ```
 
-第一阶段采用 CLI + Markdown 输出 + Streamlit 轻量可视化展示，暂不做完整 frontend/backend/server 分离架构。所有 Agent 使用规则和模板实现，不依赖外部大模型 API，保证可复现。
+默认路径使用规则和模板实现，保证无外部大模型 API 时也可复现。可选 LLM / embedding provider 用于增强生成和检索，不作为演示稳定性的前提。
+
+## 演示边界
+
+- 不自动投递。
+- 不自动向 HR 或招聘平台发送消息。
+- 不自动爬取 BOSS 直聘、实习僧、LinkedIn 等平台。
+- 浏览器插件只读取当前页面文本并辅助生成分析、话术和简历建议；复制、发送、投递动作必须由用户确认。
+- 本地上传、投递记录、知识库索引、生成 PDF 和诊断报告属于运行产物，默认不提交到 Git。
 
 ## 当前状态
 
@@ -48,27 +58,29 @@
 
 | 模块 | 内容 | 测试 |
 |---|---|---|
-| RAG MVP | schema / loader / chunker / vectorstore / retriever / pipeline | 61 passed |
-| Agent MVP | AgentTaskState / JDParserAgent / RAGRetrieveAgent / MatchAnalysisAgent / BuildAgent | 68 passed |
-| Workflow MVP | JobMatchWorkflow（串联全部 Agent） | 11 passed |
-| CLI Demo | 命令行 demo，输出 Markdown 报告 | 10 passed |
-| Streamlit Demo | 轻量可视化展示页面 | 15 static checks |
+| RAG MVP | schema / loader / chunker / vectorstore / retriever / hybrid retrieval / reranker / grading | 已覆盖测试 |
+| Agent MVP | AgentTaskState / JDParserAgent / RAGRetrieveAgent / MatchAnalysisAgent / BuildAgent | 已覆盖测试 |
+| Workflow | JobMatchWorkflow + LangGraph Agentic RAG workflow | 已覆盖测试 |
+| AgentRunService | analyze_job / discover_jobs / generate_message / handle_hr_reply 统一入口 | 已覆盖测试 |
+| CLI Demo | 命令行 demo，输出 Markdown 报告和 RAG 诊断 | 已覆盖测试 |
+| Streamlit Demo | 本地可视化求职投递管家 | static checks |
+| FastAPI / Browser Extension | 本地页面分析 API + Chrome side panel demo | 已覆盖基础测试 |
 | 文档体系 | 设计文档 / 技术决策 / 任务卡 / 运行手册 / 部署文档 | — |
 | 样例数据 | 5 份用户资料 + 4 份岗位 JD（脱敏虚构） | — |
 
-**总计：165 个测试全部通过，零外部依赖。**
+测试数量以当前 `python -m pytest -q` 输出为准。
 
-### 快速运行
+## Quick Start
 
 ```bash
 git clone https://github.com/yfn-1116/career-agent-assistant.git
 cd career-agent-assistant
 
 # 安装项目依赖
-python -m pip install -e .
+python -m pip install -e ".[dev,demo]"
 
 # 运行全部测试
-pytest tests -q
+python -m pytest -q
 
 # 运行 CLI demo（默认稳定展示方式）
 python demo/cli/run_job_match_demo.py
@@ -76,17 +88,36 @@ python demo/cli/run_job_match_demo.py
 # 查看输出
 cat outputs/demo/job_match_result.md
 
-# 可选：Streamlit 可视化展示
-python -m pip install -e ".[demo]"
+# 启动 Streamlit demo
 streamlit run demo/streamlit/app.py
+```
 
+本地 API / 浏览器插件：
+
+```bash
+# 启动本地 FastAPI 服务
+uvicorn career_agent.api.app:app --host 127.0.0.1 --port 8765
+
+# Chrome 插件
+# 1. 打开 chrome://extensions
+# 2. 开启 Developer mode
+# 3. Load unpacked -> 选择 browser_extension/
+# 4. 在岗位详情、岗位列表或聊天页面点击 Analyze Current Page
+```
+
+评估 runner：
+
+```bash
 # 运行评估 runner（检查输出质量）
 python demo/evaluation/run_evaluation.py
 cat outputs/demo/evaluation_report.md
+```
 
-# 可选：启用 LLM 增强（需要 DeepSeek API Key）
+可选 LLM 增强：
+
+```bash
 export DEEPSEEK_API_KEY=你的key
-# 代码中 BuildAgent(use_llm=True) 即可切换
+export QWEN_API_KEY=你的key
 ```
 
 ## 项目结构
@@ -95,12 +126,16 @@ export DEEPSEEK_API_KEY=你的key
 src/career_agent/
 ├── rag/           # RAG pipeline（loader, chunker, vectorstore, retriever, pipeline）
 ├── agents/        # AgentTaskState + JDParser/RAGRetrieve/MatchAnalysis/Build
-├── workflows/     # JobMatchWorkflow
-└── models/        # ModelProvider / MockProvider / DeepSeekProvider
+├── workflows/     # Python workflow + LangGraph workflow
+├── service/       # AgentRunService 统一入口
+├── api/           # FastAPI browser assistant API
+└── models/        # ModelProvider / MockProvider / DeepSeekProvider / QwenProvider
 
 demo/
 ├── cli/           # CLI demo 入口
 └── streamlit/     # Streamlit 可视化 demo
+
+browser_extension/ # Chrome side panel demo
 
 data/samples/
 ├── profile/       # 脱敏示例用户资料（5 文件）
@@ -112,6 +147,8 @@ tests/
 ├── workflows/     # 11 tests
 └── demo/          # 25 tests (10 CLI + 15 Streamlit static)
 
+runtime/           # 本地运行数据（ignored）
+outputs/           # 生成报告 / PDF / diagnostics（ignored，保留 demo/.gitkeep）
 documents/         # 设计文档、技术决策、运行手册、部署文档、日志、规划
 docs/superpowers/  # AI 协作规范与任务卡
 ```
@@ -147,9 +184,12 @@ docs/superpowers/  # AI 协作规范与任务卡
 ✅ Workflow 集成
 ✅ CLI demo
 ✅ Streamlit demo
+✅ LangGraph workflow 原型
+✅ FastAPI / Browser Extension demo
 ✅ 学校服务器部署文档
-⏳ 接入 LLM API（DeepSeek / OpenAI）
-⏳ LangGraph 状态图迁移（可选）
+⏳ 收敛 Streamlit 为薄 UI
+⏳ 加深 Evidence Gate / Faithfulness 对最终输出的约束
+⏳ 增强端到端演示测试
 ```
 
 ## 协作规则

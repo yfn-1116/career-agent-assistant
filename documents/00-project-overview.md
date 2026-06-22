@@ -6,48 +6,49 @@
 
 ## 项目定位
 
-本项目是一个面向大学生实习求职场景的 RAG + 多 Agent 原型系统。项目关注的不是“做一个网页简历生成器”，而是验证个人资料知识库和多 Agent 编排能否在求职投递场景中稳定产出可信材料。
+本项目是一个面向大学生实习求职场景的 Internship Copilot / 实习投递辅助 Agent 原型。项目关注的不是“做一个网页简历生成器”，而是验证个人资料知识库、RAG 检索、多 Agent / LangGraph 工作流和证据约束生成能否在求职投递场景中稳定产出可信材料。
 
-## 第一阶段核心链路
+## 当前核心链路
 
 ```text
-本地用户资料 Markdown
+本地用户资料 Markdown / 上传文件 / GitHub 摘要
 -> RAG 检索
 -> JD 解析
 -> 匹配分析
 -> 简历项目描述 / 沟通话术生成
--> Markdown 或 Streamlit 展示
+-> 投递记录 / 诊断报告 / Markdown 或 Streamlit 展示
 ```
 
-## 第一阶段范围
+## 当前已实现范围
 
 - 输入：本地 Markdown 用户资料、项目经历、GitHub 仓库摘要、技能材料、实习经历、示例岗位 JD。
-- 处理：JD 解析、资料检索、匹配分析、基于证据的输出生成。
-- 输出：Markdown 报告优先，Streamlit 轻量展示作为后续 demo 展示方式。
-- 工程流程：本地开发、GitHub 同步、学校服务器复现。
+- 处理：JD 解析、能力匹配、RAG 检索个人经历、检索评分、query rewrite / fallback、基于证据的输出生成。
+- 输出：CLI Markdown 报告、Streamlit demo、FastAPI browser assistant API、Chrome Browser Extension demo、投递记录 JSONL。
+- 工作流：保留普通 Python `JobMatchWorkflow`，同时提供 LangGraph / `AgentRunService` 原型作为 UI / API 的统一入口。
+- 工程流程：本地开发、GitHub 同步、学校服务器复现、pytest 自动化测试。
 
-## 第一阶段不做
+## 演示边界
 
 - 不做自动投递。
-- 不爬取 BOSS、实习僧等岗位网站。
+- 不自动向 HR 或招聘平台发送消息。
+- 不自动爬取 BOSS、实习僧、LinkedIn 等岗位网站。
+- 浏览器插件只读取当前页面文本并辅助生成分析、话术和简历建议，发送动作由用户确认。
 - 不做复杂账号系统和多用户知识库。
-- 不做完整前后端分离。
-- 不做大规模 GitHub 源码分析。
-- 不生成 PDF 简历作为核心目标。
+- 不把本地上传文件、真实简历、投递记录、知识库索引提交到 Git。
 
 ## 核心模块边界
 
 ### RAG 用户资料知识库
 
-第一阶段只处理本地 Markdown 和手写 GitHub 仓库摘要，不直接读取完整 GitHub 源码。RAG 相关核心概念包括 `ProfileItem`、`ProfileDocument`、`DocumentChunk`、`RetrievedEvidence`、`MarkdownProfileLoader`、`TextChunker`、`VectorStore interface`、`SimpleRetriever`、`RAGPipeline`。
+默认演示使用脱敏 Markdown 样例和手写 GitHub 仓库摘要。运行时上传的简历、PDF、投递记录和知识库索引写入 ignored runtime 路径，不作为可提交样例数据。RAG 相关核心概念包括 `ProfileItem`、`ProfileDocument`、`DocumentChunk`、`RetrievedEvidence`、`MarkdownProfileLoader`、`TextChunker`、`VectorStore interface`、`SimpleRetriever`、`HybridRetriever`、`RAGPipeline`、`RetrievalGradeReport`。
 
 ### 多 Agent 编排
 
-第一阶段只做四个核心 Agent：`JDParserAgent`、`RAGRetrieveAgent`、`MatchAnalysisAgent`、`BuildAgent`。Orchestrator 可以先用普通 Python workflow 或轻量状态流实现，后续再考虑 LangGraph。
+核心 Agent 包括 `JDParserAgent`、`RAGRetrieveAgent`、`MatchAnalysisAgent`、`BuildAgent`，并配套 `MessageAgent`、`HRReplyAssistant`、`JobMatchScorer`、`ApplicationRepository` 等求职场景模块。编排层同时保留普通 Python workflow 和 LangGraph workflow；`AgentRunService` 是 UI / API / CLI 调用核心能力的收敛入口。
 
 ### 展示方式
 
-第一阶段优先 CLI + Markdown 输出，再扩展 Streamlit。FastAPI + 前端分离作为第二阶段服务化扩展，不进入当前阶段。
+当前展示方式包括 CLI + Markdown、Streamlit、本地 FastAPI API 和 Chrome Browser Extension。完整生产级前后端平台仍不在当前原型范围内。
 
 ## AI 分工边界
 
@@ -57,7 +58,7 @@
 
 ## 当前状态
 
-Phase 0 已完成。当前是 Phase 1：补强核心架构边界、模块契约和后续任务卡。本轮仍然不实现业务代码。
+Phase 0 / Phase 1 的文档和 MVP 已完成。当前项目处于 Phase 2：稳定可演示、结构清晰、文档一致的 Internship Copilot 原型整理阶段，重点是收敛运行数据边界、统一文档状态、薄化 Streamlit UI、强化 `AgentRunService` 和证据约束。
 
 ## 后续维护规则
 
