@@ -44,3 +44,28 @@ class ApplicationService:
         )
         self.repository.save(record)
         return record
+
+    def create_manual_record(
+        self,
+        *,
+        job_title: str,
+        company: str = "",
+        source_url: str = "",
+        status: str = "planned",
+        notes: str = "",
+        generated_message: str = "",
+    ) -> ApplicationRecord:
+        record = ApplicationRecord(
+            application_id=uuid.uuid4().hex[:12],
+            company=company,
+            job_title=job_title,
+            source_url=source_url,
+            notes=notes,
+            communication_script=generated_message,
+            status=status,
+        )
+        self.repository.save(record)
+        return record
+
+    def list_records(self) -> list[ApplicationRecord]:
+        return self.repository.list_all()

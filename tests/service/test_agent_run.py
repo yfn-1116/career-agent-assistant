@@ -5,6 +5,7 @@ from pathlib import Path
 
 from career_agent.service.agent_run import AgentRunRequest, AgentRunService
 from career_agent.agents.state import GeneratedOutput, MatchAnalysisResult, ParsedJD
+from career_agent.api.schemas import ApplicationCreateRequest, GenerateMessageRequest, JobAnalyzeRequest
 from career_agent.evaluation.faithfulness import FaithfulnessReport
 
 PROFILE_DIR = str(Path(__file__).resolve().parents[2] / "data" / "samples" / "profile")
@@ -108,6 +109,39 @@ class TestAgentRunService:
             )
             assert record.application_id
             assert record.job_title == "Backend Intern"
+
+    def test_analyze_job_accepts_api_request_object(self):
+        svc = AgentRunService(profile_dir=PROFILE_DIR)
+        with tempfile.TemporaryDirectory() as tmp:
+            result = svc.analyze_job(
+                JobAnalyzeRequest(jd_text=SAMPLE_JD, title="AI Agent 实习生"),
+                output_dir=tmp,
+            )
+            assert result.trace_id
+            assert result.status == "completed"
+
+    def test_generate_message_accepts_api_request_object(self):
+        svc = AgentRunService(profile_dir=PROFILE_DIR)
+        result = svc.generate_message(
+            GenerateMessageRequest(jd_text=SAMPLE_JD, tone="concise", user_goal="打招呼")
+        )
+        assert result.communication_script
+
+    def test_save_application_accepts_api_request_object(self):
+        svc = AgentRunService(profile_dir=PROFILE_DIR)
+        with tempfile.TemporaryDirectory() as tmp:
+            record = svc.save_application(
+                ApplicationCreateRequest(
+                    job_title="Agent Intern",
+                    company="DemoCo",
+                    status="planned",
+                    notes="follow up",
+                    generated_message="您好",
+                ),
+                runtime_dir=tmp,
+            )
+            assert record.application_id
+            assert record.company == "DemoCo"
 
     def test_output_constraints_are_visible_in_result(self, monkeypatch):
         from career_agent.service import agent_run as agent_run_module

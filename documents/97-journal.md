@@ -2,6 +2,44 @@
 
 ## 2026-06-22
 
+### API-001 FastAPI 后端分层重构
+
+- Executor: Codex
+- Type: backend / refactor / test / docs
+- Summary:
+  - 将 `src/career_agent/api/app.py` 拆为 FastAPI app 创建入口，只负责创建 app、注册 router、配置 CORS 和基础异常处理。
+  - 新增 `src/career_agent/api/routes/`，按 health/jobs/messages/applications/knowledge/browser 拆分路由。
+  - 将 API schema 从单文件 dataclass 改为 `src/career_agent/api/schemas/` Pydantic schema 包，并保留 `career_agent.api.schemas` 导入兼容。
+  - 新增结构化核心 API：`/api/jobs/analyze`、`/api/messages/generate`、`/api/applications`、`/api/knowledge/upload`。
+  - 保留浏览器插件旧接口 `/api/browser/analyze-current-page`，并将浏览器页面分类和响应组装迁入 `BrowserAssistantService`。
+  - `AgentRunService` 入口支持 API request object 和原有 primitive 参数两种调用方式，便于 API / Streamlit / Browser Extension 复用。
+  - 明确 runtime 数据边界：ApplicationService / KnowledgeBaseService 默认写入 `runtime/`，不污染 `data/samples/` 或 tracked knowledge-base index。
+  - README 和项目总览补充 FastAPI 后端分层、Swagger、Streamlit 只是 demo UI、不使用 Flask 的说明。
+- Changed files:
+  - `src/career_agent/api/app.py`
+  - `src/career_agent/api/routes/*.py`
+  - `src/career_agent/api/schemas/*.py`
+  - `src/career_agent/service/browser_service.py`
+  - `src/career_agent/service/agent_run.py`
+  - `src/career_agent/service/application_service.py`
+  - `src/career_agent/applications/repository.py`
+  - `src/career_agent/repository/__init__.py`
+  - `tests/api/test_backend_routes.py`
+  - `tests/api/test_browser_api.py`
+  - `tests/service/test_agent_run.py`
+  - `README.md`
+  - `documents/00-project-overview.md`
+  - `documents/97-journal.md`
+  - `documents/99-project-planning.md`
+  - `pyproject.toml`
+- Validation:
+  - `python -m pytest tests/api/test_backend_routes.py -q` — 5 passed
+  - `python -m pytest tests/api/test_browser_api.py -q` — 4 passed, 2 existing PDF font deprecation warnings
+  - `python -m pytest tests/service -q` — 16 passed
+  - `python -m pytest -q` — 547 passed, 2 warnings, 0 failed, 0 skipped, 138.96s
+- Next:
+  - Optional: address FPDF `uni` parameter deprecation warning in `pdf_exporter.py`.
+
 ### E2E-001 全量测试与演示稳定性验证
 
 - Executor: Codex

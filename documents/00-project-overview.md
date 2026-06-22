@@ -27,6 +27,24 @@
 - 工作流：保留普通 Python `JobMatchWorkflow`，同时提供 LangGraph / `AgentRunService` 原型作为 UI / API 的统一入口。
 - 工程流程：本地开发、GitHub 同步、学校服务器复现、pytest 自动化测试。
 
+## 后端服务边界
+
+本项目后端使用 FastAPI，不使用 Flask。FastAPI 负责 API 服务、请求/响应模型、错误处理和自动 Swagger / OpenAPI 文档；Streamlit 是 demo UI，不是后端服务。
+
+目标调用链：
+
+```text
+FastAPI routes
+-> Service
+-> AgentRunService / ApplicationService / KnowledgeBaseService / BrowserAssistantService
+-> Repository / LangGraph Workflow / RAG / Matching / Message Generation
+-> Response Schema
+```
+
+- `AgentRunService` 是业务统一入口，负责调用 LangGraph workflow、RAG、matching、message generation 和 application persistence。
+- Repository 层负责 runtime 本地 JSONL、上传文件和运行数据读写，后续可以替换为数据库。
+- Browser Extension 继续使用 `POST /api/browser/analyze-current-page`，但不会自动投递，也不会自动发送 HR 消息。
+
 ## 演示边界
 
 - 不做自动投递。

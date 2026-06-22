@@ -100,12 +100,15 @@ class AgentRunService:
 
     def analyze_job(
         self,
-        raw_jd: str,
+        raw_jd: Any,
         *,
         user_message: str = "",
         output_dir: str = "outputs/demo",
     ) -> AgentRunResult:
         """Analyze one job posting through the canonical Agentic RAG path."""
+        if not isinstance(raw_jd, str):
+            user_message = user_message or str(getattr(raw_jd, "title", "") or getattr(raw_jd, "company", ""))
+            raw_jd = str(getattr(raw_jd, "jd_text", "") or getattr(raw_jd, "raw_jd", "") or getattr(raw_jd, "user_message", ""))
         return self.run(
             AgentRunRequest(
                 user_message=user_message or raw_jd,
@@ -129,6 +132,7 @@ class AgentRunService:
 
     def generate_message(
         self,
+        request: Any | None = None,
         *,
         job_title: str = "",
         company: str = "",
@@ -139,6 +143,9 @@ class AgentRunService:
     ) -> AgentRunResult:
         """Generate a user-reviewed communication draft."""
         from career_agent.messages.agent import MessageAgent
+
+        if request is not None:
+            job_title = job_title or str(getattr(request, "job_id", "") or "该岗位")
 
         draft = MessageAgent().generate(
             message_type,
@@ -160,7 +167,7 @@ class AgentRunService:
 
     def generate_resume_suggestions(
         self,
-        raw_jd: str,
+        raw_jd: Any,
         *,
         output_dir: str = "outputs/demo",
     ) -> AgentRunResult:
@@ -184,15 +191,25 @@ class AgentRunService:
 
     def save_application(
         self,
-        result: AgentRunResult,
+        result: Any,
         *,
-        job_title: str,
+        job_title: str = "",
         company: str = "",
         jd_text: str = "",
         runtime_dir: str = "runtime",
     ):
         """Persist an application record through the application service."""
         from career_agent.service.application_service import ApplicationService
+
+        if not isinstance(result, AgentRunResult):
+            return ApplicationService(runtime_dir=runtime_dir).create_manual_record(
+                job_title=job_title or str(getattr(result, "job_title", "")),
+                company=company or str(getattr(result, "company", "")),
+                source_url=str(getattr(result, "source_url", "")),
+                status=str(getattr(result, "status", "planned")),
+                notes=str(getattr(result, "notes", "")),
+                generated_message=str(getattr(result, "generated_message", "")),
+            )
 
         return ApplicationService(runtime_dir=runtime_dir).save_from_agent_result(
             result,

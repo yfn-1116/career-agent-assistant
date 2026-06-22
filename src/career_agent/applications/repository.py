@@ -19,6 +19,8 @@ class ApplicationRecord:
     company: str = ""
     job_title: str = ""
     jd_text: str = ""
+    source_url: str = ""
+    notes: str = ""
     match_score: float = 0.0
     matched_skills: list[str] = field(default_factory=list)
     missing_skills: list[str] = field(default_factory=list)
@@ -35,6 +37,7 @@ class ApplicationRecord:
         return {
             "application_id": self.application_id, "company": self.company,
             "job_title": self.job_title, "jd_text": self.jd_text,
+            "source_url": self.source_url, "notes": self.notes,
             "match_score": self.match_score, "matched_skills": self.matched_skills,
             "missing_skills": self.missing_skills, "generated_resume_path": self.generated_resume_path,
             "communication_script": self.communication_script, "status": self.status,

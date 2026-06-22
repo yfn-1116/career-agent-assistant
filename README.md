@@ -106,7 +106,10 @@ streamlit run demo/streamlit/app.py
 
 ```bash
 # 启动本地 FastAPI 服务
-uvicorn career_agent.api.app:app --host 127.0.0.1 --port 8765
+uvicorn career_agent.api.app:app --reload
+
+# 查看 Swagger / OpenAPI 文档
+# http://127.0.0.1:8000/docs
 
 # Chrome 插件
 # 1. 打开 chrome://extensions
@@ -138,7 +141,8 @@ src/career_agent/
 ├── agents/        # AgentTaskState + JDParser/RAGRetrieve/MatchAnalysis/Build
 ├── workflows/     # Python workflow + LangGraph workflow
 ├── service/       # AgentRunService 统一入口
-├── api/           # FastAPI browser assistant API
+├── api/           # FastAPI routes + Pydantic schemas
+├── repository/    # Repository layer exports for runtime storage
 └── models/        # ModelProvider / MockProvider / DeepSeekProvider / QwenProvider
 
 demo/
@@ -162,6 +166,34 @@ outputs/           # 生成报告 / PDF / diagnostics（ignored，保留 demo/.g
 documents/         # 设计文档、技术决策、运行手册、部署文档、日志、规划
 docs/superpowers/  # AI 协作规范与任务卡
 ```
+
+## 后端分层
+
+本项目后端使用 **FastAPI**，不使用 Flask 或 Django。
+
+```text
+FastAPI routes
+-> Service
+-> AgentRunService / ApplicationService / KnowledgeBaseService / BrowserAssistantService
+-> Repository / LangGraph Workflow / RAG / Matching / Message Generation
+-> Pydantic Response Schema
+```
+
+- FastAPI：负责路由、请求/响应 schema、CORS、Swagger / OpenAPI 文档。
+- Service：负责编排业务流程，API 和 Streamlit 都应优先调用 service。
+- Repository：负责本地 JSONL、runtime 上传文件和运行数据读写，后续可替换为数据库。
+- LangGraph：负责编排 Agentic RAG 工作流。
+- RAG + Evidence Gate：负责证据检索、检索质量诊断和可信生成约束，避免编造经历。
+
+当前核心 API：
+
+- `GET /api/health`
+- `POST /api/jobs/analyze`
+- `POST /api/messages/generate`
+- `POST /api/applications`
+- `GET /api/applications`
+- `POST /api/knowledge/upload`
+- `POST /api/browser/analyze-current-page`（浏览器插件兼容接口）
 
 ## GitHub 仓库资料读取
 
