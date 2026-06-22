@@ -12,10 +12,20 @@ venv/
 
 # Data and generated outputs
 data/private/
+data/uploads/
+data/applications/
+data/knowledge_base/chunks.jsonl
+data/knowledge_base/chunks.repos.txt
+runtime/
+.local/
 outputs/*
 !outputs/demo/
 !outputs/demo/.gitkeep
 outputs/demo/*.md
+outputs/**/*.json
+outputs/**/*.pdf
+*.log
+*.tmp
 
 # IDE and OS
 .DS_Store
