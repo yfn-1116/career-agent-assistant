@@ -2,6 +2,30 @@
 
 ## 2026-06-22
 
+### STREAMLIT-001 Streamlit demo 薄 UI 拆分
+
+- Executor: Codex
+- Type: refactor / test
+- Summary:
+  - 新增 `KnowledgeBaseService`，负责 runtime 上传文件保存、文本 chunking、知识库 JSONL 持久化、知识库检索和 GitHub README/公开仓库导入。
+  - 新增 `ApplicationService`，封装 `ApplicationRepository`，从 `AgentRunResult` 保存投递记录到 ignored runtime 路径。
+  - 重写 `demo/streamlit/app.py` 为薄 UI：页面布局、按钮、聊天展示保留在 Streamlit；上传、GitHub 导入、投递记录保存、JD 分析分别委托给 service/repository/AgentRunService。
+  - 移除 Streamlit 中对 `data/uploads`、`data/applications`、`data/knowledge_base` 的直接写入，也移除 UI 层直接网络读取 GitHub 的逻辑。
+  - 补充 runtime service 测试和 Streamlit 静态边界测试。
+- Changed files:
+  - `src/career_agent/service/knowledge_base.py`
+  - `src/career_agent/service/application_service.py`
+  - `demo/streamlit/app.py`
+  - `tests/service/test_runtime_services.py`
+  - `tests/demo/test_streamlit_app_static.py`
+  - `documents/97-journal.md`
+  - `documents/99-project-planning.md`
+- Validation:
+  - `python -m pytest tests/service/test_runtime_services.py -q` — 3 passed
+  - `python -m pytest tests/demo/test_streamlit_app_static.py -q` — 12 passed
+- Next:
+  - Continue with `AgentRunService` entrypoint consolidation for API / UI / Browser demo paths.
+
 ### DATA-001 / DOC-SYNC-002 运行数据边界与 Phase 2 文档同步
 
 - Executor: Codex

@@ -20,6 +20,11 @@ class TestAppUsesAgentRunService:
         text = _read_app()
         assert "AgentRunService" in text or "agent_run" in text
 
+    def test_uses_runtime_services(self):
+        text = _read_app()
+        assert "KnowledgeBaseService" in text
+        assert "ApplicationService" in text
+
     def test_does_not_directly_import_rag_for_workflow(self):
         """Main workflow must go through AgentRunService, not direct RAG/Agent calls."""
         text = _read_app()
@@ -50,6 +55,16 @@ class TestAppDoesNotImportForbiddenModules:
         forbidden = ["urllib", "requests.get", "requests.post"]
         for token in forbidden:
             assert token not in text.lower()
+
+    def test_no_direct_runtime_data_paths(self):
+        text = _read_app()
+        forbidden = [
+            "data/uploads",
+            "data/applications",
+            "data/knowledge_base",
+        ]
+        for token in forbidden:
+            assert token not in text
 
 
 class TestAppDoesNotRewriteCoreLogic:

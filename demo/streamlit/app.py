@@ -1,189 +1,187 @@
-"""求职投递管家 — 上传资料 → 分析 → 搜岗位 → 生成话术+简历 → 记录"""
+"""Smart Apply Agent — Streamlit UI for the Internship Copilot demo."""
 
-import sys, tempfile, os, json, uuid
 from pathlib import Path
-from datetime import datetime, timezone
+import sys
+
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(_REPO_ROOT / "src"))
 
 import streamlit as st
 
-st.set_page_config(page_title="求职投递管家", page_icon="🤖", layout="wide")
+from career_agent.service.agent_run import AgentRunRequest, AgentRunService
+from career_agent.service.application_service import ApplicationService
+from career_agent.service.knowledge_base import KnowledgeBaseService
 
-# ---- Session Init (persistent across refreshes) ----
-for k, v in {
-    "messages": [], "profile_summary": "", "applications": [],
-}.items():
-    if k not in st.session_state:
-        st.session_state[k] = v
 
-# 持久化知识库：从磁盘恢复
-KB_FILE = Path("data/knowledge_base/chunks.jsonl")
-KB_FILE.parent.mkdir(parents=True, exist_ok=True)
-if "kb_chunks" not in st.session_state:
-    st.session_state.kb_chunks = 0
-if "github_repos" not in st.session_state:
-    saved_repos = []
-    if KB_FILE.with_suffix(".repos.txt").exists():
-        saved_repos = KB_FILE.with_suffix(".repos.txt").read_text().strip().split("\n")
-        saved_repos = [r for r in saved_repos if r]
-    st.session_state.github_repos = saved_repos
-if "kw_store" not in st.session_state:
-    from career_agent.rag.vectorstores.memory_store import MemoryVectorStore
-    st.session_state["kw_store"] = MemoryVectorStore()
-    # 从磁盘恢复 chunks
-    if KB_FILE.exists():
-        from career_agent.rag.schemas import DocumentChunk
-        count = 0
-        with open(KB_FILE) as f:
-            for line in f:
-                if line.strip():
-                    try:
-                        d = __import__("json").loads(line)
-                        st.session_state["kw_store"].add_chunks([DocumentChunk(
-                            chunk_id=d["chunk_id"], document_id=d.get("document_id",""),
-                            content=d["content"], source_path=d.get("source_path",""),
-                            chunk_index=d.get("chunk_index",0),
-                            metadata=d.get("metadata",{})
-                        )])
-                        count += 1
-                    except Exception:
-                        pass
-        st.session_state.kb_chunks = count
+PROFILE_DIR = str(_REPO_ROOT / "data" / "samples" / "profile")
+OUTPUT_DIR = str(_REPO_ROOT / "outputs" / "demo")
 
-# ---- Helpers ----
-def _rag_index(content, source_name="upload"):
-    """将文本导入 RAG 知识库，并持久化到磁盘"""
-    import hashlib, json
-    from career_agent.rag.schemas import ProfileDocument
-    from career_agent.rag.chunking.text_chunker import TextChunker
-    from career_agent.rag.vectorstores.memory_store import MemoryVectorStore
-    doc_id = hashlib.sha256(source_name.encode()).hexdigest()[:16]
-    doc = ProfileDocument(document_id=doc_id, source_path=source_name, title=source_name, content=content, item_type="profile")
-    chunks = TextChunker().chunk_document(doc)
-    if "kw_store" not in st.session_state:
-        st.session_state["kw_store"] = MemoryVectorStore()
-    st.session_state["kw_store"].add_chunks(chunks)
-    # 持久化到磁盘
-    with open(KB_FILE, "a") as f:
-        for c in chunks:
-            f.write(json.dumps({"chunk_id":c.chunk_id,"document_id":c.document_id,"content":c.content,"source_path":c.source_path,"chunk_index":c.chunk_index,"metadata":c.metadata}, ensure_ascii=False)+"\n")
-    st.session_state.kb_chunks += len(chunks)
-    # 保存 GitHub repos 列表
-    KB_FILE.with_suffix(".repos.txt").write_text("\n".join(st.session_state.github_repos))
-    return len(chunks)
 
-def _llm(prompt, system="你是专业的求职顾问助手"):
-    """调用千问 LLM"""
-    from career_agent.infrastructure.llm.qwen_provider import QwenProvider
-    llm = QwenProvider()
-    if llm.is_available:
-        return llm.generate(prompt, system_prompt=system)
+@st.cache_resource
+def _services() -> tuple[KnowledgeBaseService, ApplicationService, AgentRunService]:
+    return (
+        KnowledgeBaseService(),
+        ApplicationService(),
+        AgentRunService(profile_dir=PROFILE_DIR),
+    )
+
+
+def _llm(prompt: str, system: str = "你是专业的求职顾问助手") -> str | None:
+    """Optional Qwen LLM wrapper for conversational polish."""
+    try:
+        from career_agent.infrastructure.llm.qwen_provider import QwenProvider
+
+        llm = QwenProvider()
+        if llm.is_available:
+            return llm.generate(prompt, system_prompt=system)
+    except Exception:
+        return None
     return None
 
-def _save_application(job_title, company, jd_text, match_score, message, resume_md):
-    """保存投递记录 JSONL"""
-    record = {
-        "id": uuid.uuid4().hex[:12],
-        "company": company, "job_title": job_title, "jd_text": jd_text[:500],
-        "match_score": match_score, "message": message, "resume": resume_md[:500],
-        "status": "analyzed", "created_at": datetime.now(timezone.utc).isoformat()
-    }
-    st.session_state.applications.append(record)
-    Path("data/applications").mkdir(parents=True, exist_ok=True)
-    with open("data/applications/applications.jsonl", "a") as f:
-        f.write(json.dumps(record, ensure_ascii=False) + "\n")
-    return record["id"]
 
-# ---- Sidebar: Knowledge Base ----
+def _refresh_runtime_state(kb_service: KnowledgeBaseService, app_service: ApplicationService) -> None:
+    _, chunk_count = kb_service.load_store()
+    st.session_state.kb_chunks = chunk_count
+    st.session_state.github_repos = kb_service.load_github_repos()
+    st.session_state.applications = [
+        record.to_dict() for record in app_service.repository.list_all()
+    ]
+
+
+def _answer_general_question(
+    user_input: str,
+    kb_service: KnowledgeBaseService,
+) -> str:
+    evidence = kb_service.search(user_input, top_k=5) if st.session_state.kb_chunks else []
+    sources = kb_service.list_sources()
+    snippets = "\n".join(
+        f"[{item.source_path}] {item.content[:200]}" for item in evidence
+    )
+    context = f"""你是用户的求职顾问，像朋友一样聊天。简洁、真诚。
+
+知识库文件列表: {sources or '暂无'}
+GitHub: {', '.join(st.session_state.github_repos) if st.session_state.github_repos else '暂无'}
+已索引内容: {st.session_state.kb_chunks} 条
+用户画像: {st.session_state.profile_summary or ''}
+
+检索结果:
+{snippets}
+
+用户问: {user_input}
+
+规则:
+- 如果用户问是否看到简历或项目资料，根据知识库文件列表如实回答。
+- 基于检索内容回答，尽量引用具体文件名。
+- 不要声称已经自动投递或自动联系 HR。"""
+    return _llm(context, "你是求职顾问，能看到用户上传的资料索引。简洁、真诚。") or (
+        "当前 LLM 不可用。已读取本地知识库索引，建议粘贴岗位 JD 触发完整匹配分析。"
+    )
+
+
+def _is_job_input(text: str) -> bool:
+    job_tokens = ["岗位要求", "岗位职责", "任职要求", "职位描述", "JD", "招聘", "薪资", "实习"]
+    return len(text) > 200 or any(token in text for token in job_tokens)
+
+
+st.set_page_config(page_title="Smart Apply Agent", page_icon="🤖", layout="wide")
+kb_service, app_service, agent_service = _services()
+
+for key, value in {
+    "messages": [],
+    "profile_summary": "",
+    "applications": [],
+    "github_repos": [],
+    "kb_chunks": 0,
+}.items():
+    if key not in st.session_state:
+        st.session_state[key] = value
+
+_refresh_runtime_state(kb_service, app_service)
+
 with st.sidebar:
     st.header("📁 知识库")
     st.metric("已索引", st.session_state.kb_chunks)
 
-    # File upload
-    uploaded = st.file_uploader("上传简历/项目 (PDF/DOCX/MD)", type=["pdf","docx","md","txt"], accept_multiple_files=True)
+    uploaded = st.file_uploader(
+        "上传简历/项目 (PDF/DOCX/MD/TXT)",
+        type=["pdf", "docx", "md", "txt"],
+        accept_multiple_files=True,
+    )
     if uploaded and st.button("📥 导入到知识库"):
-        upload_dir = Path("data/uploads")
-        upload_dir.mkdir(parents=True, exist_ok=True)
-        for f in uploaded:
-            # 保存到磁盘
-            save_path = upload_dir / f.name
-            save_path.write_bytes(f.read())
-            st.info(f"📄 正在解析 {f.name}...")
+        for file in uploaded:
+            st.info(f"📄 正在解析 {file.name}...")
             try:
-                from career_agent.rag.loaders.file_loader import FileLoader
-                doc = FileLoader().load(save_path)
-                n = _rag_index(doc.content, f.name)
-                st.success(f"✅ {f.name} → {n} chunks (已导入知识库)")
-            except Exception as e:
-                st.error(f"❌ {f.name}: 解析失败 — {e}")
+                result = kb_service.ingest_upload(file.name, file.read())
+                st.success(f"✅ {file.name} → {result.chunk_count} chunks")
+            except Exception as exc:
+                st.error(f"❌ {file.name}: 解析失败 - {exc}")
         st.rerun()
 
-    # GitHub
     st.divider()
     st.header("🔗 GitHub")
     gh_user = st.text_input("GitHub 用户名", placeholder="yfn-1116")
-    if st.button("📥 读取所有公开仓库"):
-        if gh_user.strip():
-            _fetch_all_repos(gh_user.strip())
-            st.rerun()
+    if st.button("📥 读取所有公开仓库") and gh_user.strip():
+        try:
+            count = kb_service.ingest_github_user(gh_user.strip())
+            st.success(f"✅ {count} 个仓库已导入知识库")
+        except Exception as exc:
+            st.error(f"获取仓库失败，请稍后重试: {exc}")
+        st.rerun()
 
     repo = st.text_input("单个仓库", placeholder="用户名/仓库名")
-    if st.button("🔗 读取这个仓库"):
-        if repo.strip():
-            _fetch_one_repo(repo.strip())
-            st.rerun()
+    if st.button("🔗 读取这个仓库") and repo.strip():
+        try:
+            result = kb_service.ingest_github_repo(repo.strip())
+            st.success(f"✅ {repo.strip()} → {result.chunk_count} chunks")
+        except Exception as exc:
+            st.error(f"❌ {repo.strip()}: {exc}")
+        st.rerun()
 
-    # Profile status
     if st.session_state.github_repos:
         st.caption("已读仓库:")
-        for r in st.session_state.github_repos:
-            st.caption(f"  • {r}")
+        for repo_name in st.session_state.github_repos:
+            st.caption(f"  • {repo_name}")
 
     st.divider()
-    if st.button("🔍 分析我的Profile"):
+    if st.button("🔍 分析我的 Profile"):
         if st.session_state.kb_chunks > 0:
-            with st.spinner("LLM 分析中..."):
-                summary = _llm(
-                    f"用户已上传 {st.session_state.kb_chunks} 条资料。请分析用户的技能、项目、优势、适合的岗位方向，100字以内。",
-                    "你是求职顾问，简洁分析用户画像。"
-                )
-                st.session_state.profile_summary = summary or "LLM 不可用"
+            summary = _llm(
+                f"用户已上传 {st.session_state.kb_chunks} 条资料。请分析用户的技能、项目、优势、适合的岗位方向，100字以内。",
+                "你是求职顾问，简洁分析用户画像。",
+            )
+            st.session_state.profile_summary = summary or "LLM 不可用，已保留本地知识库索引。"
         else:
             st.warning("请先上传资料")
     if st.session_state.profile_summary:
         st.info(st.session_state.profile_summary)
 
-# ---- Main Chat ----
-st.title("🤖 求职投递管家")
-st.caption("上传简历和GitHub → 粘贴JD → 生成话术+简历 → 保存记录")
+st.title("Smart Apply Agent")
+st.caption("Ask Agent：上传资料和 GitHub 摘要，粘贴 JD，生成匹配分析、话术和简历建议。不会自动投递或自动发送消息。")
 
-# Chat history
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
 
-# Input — chat_input 支持 Enter 发送
-user_input = st.chat_input("问我任何求职问题，或粘贴 JD...")
+user_input = st.chat_input("Ask Agent about a job, resume, or pasted JD...")
 
 if user_input and user_input.strip():
     st.session_state.messages.append({"role": "user", "content": user_input})
-    with st.chat_message("user"): st.markdown(user_input)
-
-    # 判断是 JD 分析还是普通对话
-    is_jd = any(kw in user_input for kw in ["岗位要求", "岗位职责", "任职要求", "职位描述", "JD", "招聘", "薪资", "实习"])
-    is_long = len(user_input) > 200
+    with st.chat_message("user"):
+        st.markdown(user_input)
 
     with st.chat_message("assistant"):
-        with st.spinner("思考中..."):
+        with st.spinner("分析中..."):
+            if _is_job_input(user_input):
+                result = agent_service.run(
+                    AgentRunRequest(
+                        user_message=user_input,
+                        raw_jd=user_input,
+                        mode="analyze_job",
+                    ),
+                    output_dir=OUTPUT_DIR,
+                )
 
-            if is_jd or is_long:
-                # === JD 模式：完整 RAG + Agent 分析 ===
-                from career_agent.service.agent_run import AgentRunRequest, AgentRunService
-                svc = AgentRunService(profile_dir="data/samples/profile")
-                result = svc.run(AgentRunRequest(user_message=user_input, raw_jd=user_input, mode="analyze_job"))
-
-                jd_prompt = f"""你是一个实习求职投递管家。基于以下信息给用户一个自然、有用的回答。
+                prompt = f"""你是一个实习求职投递管家。基于以下信息给用户一个自然、有用的回答。
 
 用户画像: {st.session_state.profile_summary}
 知识库: {st.session_state.kb_chunks} 条资料
@@ -191,130 +189,32 @@ GitHub: {', '.join(st.session_state.github_repos)}
 RAG 检索: {result.final_answer[:2000]}
 用户输入: {user_input}
 
-用对话的语气回复，包括：
-1. 匹配度判断
-2. 优势和不足
-3. 可以怎么准备
-4. 沟通话术（如果需要）
-5. 下一步建议"""
-                answer = _llm(jd_prompt, "你是求职投递管家，像朋友一样聊天，简洁直接。") or result.final_answer
+请输出匹配判断、优势、不足、沟通建议和下一步行动。不要声称已经自动投递或自动发送。"""
+                answer = _llm(prompt, "你是求职投递管家，简洁直接，不编造经历。") or result.final_answer
 
-                # Auto-save
-                app_id = _save_application(
+                record = app_service.save_from_agent_result(
+                    result,
                     job_title=user_input.split("\n")[0][:50],
-                    company="", jd_text=user_input,
-                    match_score=result.match_score,
-                    message=result.communication_script,
-                    resume_md="\n".join(result.generated_bullets)
+                    company="",
+                    jd_text=user_input,
                 )
-                st.success(f"📌 已保存 #{app_id}")
-
+                st.success(f"📌 已保存投递记录 #{record.application_id}")
             else:
-                # === 对话模式：LLM + 知识库检索 ===
-                # 1. RAG 检索 + 列出知识库文件
-                rag_context = ""
-                # 列出知识库里有哪些文件
-                try:
-                    sources = set()
-                    if "kw_store" in st.session_state and st.session_state.kb_chunks > 0:
-                        evidence = st.session_state.kw_store.search(user_input, top_k=5)
-                        rag_context = "\n".join(
-                            f"[{e.source_path}] {e.content[:200]}" for e in evidence
-                        )
-                        for e in evidence:
-                            sources.add(e.source_path)
-                    # 告诉 LLM 知识库里有哪些文件
-                    all_sources = set()
-                    if KB_FILE.exists():
-                        import json as _json
-                        with open(KB_FILE) as f:
-                            for line in f:
-                                if line.strip():
-                                    s = _json.loads(line).get("source_path","")
-                                    if s: all_sources.add(s)
-                    if all_sources:
-                        rag_context = f"知识库文件列表: {sorted(all_sources)}\n\n检索结果:\n{rag_context}"
-                except Exception:
-                    pass
-
-                # 2. LLM 回答
-                ctx = f"""你是用户的求职顾问，像朋友一样聊天。简洁、真诚。
-
-你的知识库:
-- GitHub: {', '.join(st.session_state.github_repos) if st.session_state.github_repos else '暂无'}
-- {st.session_state.kb_chunks} 条已索引内容
-- {st.session_state.profile_summary or ''}
-
-{rag_context}
-
-用户问: {user_input}
-
-规则:
-- 知识库文件列表里的文件就是用户上传的资料，如实告诉用户你有哪些资料
-- 如果用户问「看到我的简历了吗」，检查文件列表里有没有 PDF 文件，如实说有或没有
-- 基于检索内容回答，引用具体文件名
-- 像朋友聊天，不要列太多 bullet point"""
-                answer = _llm(ctx, "你是求职顾问，能看到用户上传的所有资料。简洁、真诚。") or "抱歉，LLM 不可用。"
+                answer = _answer_general_question(user_input, kb_service)
 
             st.markdown(answer)
             st.session_state.messages.append({"role": "assistant", "content": answer})
 
-# ---- Footer: Application Records ----
 st.divider()
 st.subheader("📋 投递记录")
+_refresh_runtime_state(kb_service, app_service)
 if not st.session_state.applications:
     st.caption("暂无记录。分析岗位后自动保存。")
 else:
-    for app in reversed(st.session_state.applications[-5:]):
-        with st.expander(f"{app['job_title'][:40]} | 匹配 {app['match_score']:.0%} | {app['status']}"):
-            st.markdown(f"**话术**: {app.get('message','')[:200]}")
-            st.markdown(f"**简历**: {app.get('resume','')[:200]}")
-            st.caption(f"ID: {app['id']} | {app['created_at']}")
-
-def _fetch_one_repo(repo_name):
-    """读取单个 GitHub 仓库 README"""
-    import urllib.request
-    try:
-        url = f"https://raw.githubusercontent.com/{repo_name}/main/README.md"
-        req = urllib.request.Request(url, headers={"User-Agent": "smart-apply"})
-        with urllib.request.urlopen(req, timeout=10) as r:
-            content = r.read().decode("utf-8", errors="replace")
-        n = _rag_index(content, f"github:{repo_name}")
-        if repo_name not in st.session_state.github_repos:
-            st.session_state.github_repos.append(repo_name)
-            KB_FILE.with_suffix(".repos.txt").write_text("\n".join(st.session_state.github_repos))
-        st.success(f"✅ {repo_name} → {n} chunks")
-    except Exception as e:
-        st.error(f"❌ {repo_name}: {e}")
-
-def _fetch_all_repos(username):
-    """读取用户所有公开仓库"""
-    import urllib.request, json
-    try:
-        url = f"https://api.github.com/users/{username}/repos?per_page=100&sort=updated"
-        req = urllib.request.Request(url, headers={"User-Agent": "smart-apply", "Accept": "application/vnd.github.v3+json"})
-        with urllib.request.urlopen(req, timeout=15) as r:
-            repos = json.loads(r.read().decode("utf-8"))
-    except Exception as e:
-        st.error(f"获取仓库列表失败 (API限流，稍后重试): {e}")
-        return
-    count = 0
-    for rd in repos:
-        if rd.get("fork"): continue
-        name = rd["full_name"]
-        desc = rd.get("description", "")
-        lang = rd.get("language", "")
-        stars = rd.get("stargazers_count", 0)
-        content = f"# {name}\n{desc}\n语言:{lang} Stars:{stars}\n"
-        try:
-            rurl = f"https://raw.githubusercontent.com/{name}/main/README.md"
-            req2 = urllib.request.Request(rurl, headers={"User-Agent": "smart-apply"})
-            with urllib.request.urlopen(req2, timeout=8) as r2:
-                content += r2.read().decode("utf-8", errors="replace")
-        except: pass
-        _rag_index(content, f"github:{name}")
-        if name not in st.session_state.github_repos:
-            st.session_state.github_repos.append(name)
-        count += 1
-    KB_FILE.with_suffix(".repos.txt").write_text("\n".join(st.session_state.github_repos))
-    st.success(f"✅ {count} 个仓库 → {st.session_state.kb_chunks} chunks")
+    for application in reversed(st.session_state.applications[-5:]):
+        title = application.get("job_title", "未知岗位")[:40]
+        score = float(application.get("match_score", 0.0))
+        status = application.get("status", "analyzed")
+        with st.expander(f"{title} | 匹配 {score:.0%} | {status}"):
+            st.markdown(f"**话术**: {application.get('communication_script', '')[:200]}")
+            st.caption(f"ID: {application.get('application_id', '')} | {application.get('created_at', '')}")
