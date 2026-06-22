@@ -2,6 +2,22 @@
 
 ## 2026-06-22
 
+### E2E-001 全量测试与演示稳定性验证
+
+- Executor: Codex
+- Type: test / verification
+- Summary:
+  - 补强本轮新增测试覆盖：runtime knowledge-base service、application service、AgentRunService 端到端入口、Browser API、Streamlit 静态边界、Evidence status 输出约束。
+  - 完整运行 `python -m pytest -q`，验证 CLI/API/service/RAG/Agent/workflow/demo 测试在本轮 refactor 后仍一致。
+- Changed files:
+  - `documents/97-journal.md`
+  - `documents/99-project-planning.md`
+- Validation:
+  - `python -m pytest -q` — 539 passed, 2 warnings, 0 failed, 0 skipped, 127.14s
+  - Warnings: `src/career_agent/resume/pdf_exporter.py` 中 FPDF `uni` 参数 deprecation warning，非本轮功能失败。
+- Next:
+  - 可选后续：处理 FPDF deprecation warning、继续薄化 CLI 中的可选 provider wiring、增加真实浏览器插件手动验收记录。
+
 ### EVIDENCE-001 最终输出证据约束增强
 
 - Executor: Codex
