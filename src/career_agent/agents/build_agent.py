@@ -14,6 +14,12 @@ from career_agent.agents.state import (
     ParsedJD,
 )
 from career_agent.models.provider import ModelProvider
+from career_agent.profile.schema import (
+    STATUS_DESIGNED,
+    STATUS_IMPLEMENTED,
+    STATUS_PLANNED,
+    STATUS_UNCERTAIN,
+)
 from career_agent.rag.schemas import RetrievedEvidence
 
 
@@ -49,13 +55,18 @@ class BuildAgent:
         resume_bullets = self._build_resume_bullets(evidence, match_analysis)
         communication = self._build_communication(parsed_jd, match_analysis, evidence)
         summary = self._build_summary(parsed_jd, match_analysis, evidence)
+        constraint_metadata = self._build_constraint_metadata(evidence, resume_bullets)
 
         return GeneratedOutput(
             resume_bullets=resume_bullets,
             communication_message=communication,
             summary=summary,
             evidence_refs=evidence_refs,
-            metadata={"builder": "build_agent", "use_llm": self.use_llm},
+            metadata={
+                "builder": "build_agent",
+                "use_llm": self.use_llm,
+                **constraint_metadata,
+            },
         )
 
     # -- llm helpers ---------------------------------------------------------
@@ -123,15 +134,30 @@ class BuildAgent:
 
         bullets: list[str] = []
         for ev in evidence:
+            status = self._evidence_status(ev)
             if ev.title:
-                bullets.append(
-                    f"- 参与「{ev.title}」项目：{self._snippet(ev.content)} "
-                    f"（来源：{ev.source_path}）"
-                )
+                if status == STATUS_DESIGNED:
+                    bullets.append(
+                        f"- 设计/规划「{ev.title}」相关方案：{self._snippet(ev.content)} "
+                        f"（来源：{ev.source_path}，需用户确认后使用）"
+                    )
+                elif status in (STATUS_PLANNED, STATUS_UNCERTAIN):
+                    bullets.append(
+                        f"- 「{ev.title}」仅作为补强方向：{self._snippet(ev.content)} "
+                        f"（来源：{ev.source_path}，不能直接写入简历）"
+                    )
+                else:
+                    bullets.append(
+                        f"- 参与「{ev.title}」项目：{self._snippet(ev.content)} "
+                        f"（来源：{ev.source_path}）"
+                    )
             else:
-                bullets.append(
-                    f"- {self._snippet(ev.content)} （来源：{ev.source_path}）"
-                )
+                suffix = f"（来源：{ev.source_path}）"
+                if status == STATUS_DESIGNED:
+                    suffix = f"（来源：{ev.source_path}，需用户确认后使用）"
+                elif status in (STATUS_PLANNED, STATUS_UNCERTAIN):
+                    suffix = f"（来源：{ev.source_path}，不能直接写入简历）"
+                bullets.append(f"- {self._snippet(ev.content)} {suffix}")
 
         for s in analysis.strengths[:3]:
             if "「" in s:
@@ -196,3 +222,57 @@ class BuildAgent:
         if len(text) <= max_len:
             return text
         return text[:max_len] + "…"
+
+    @staticmethod
+    def _evidence_status(ev: RetrievedEvidence) -> str:
+        status = ""
+        if isinstance(ev.metadata, dict):
+            status = str(ev.metadata.get("status", "")).strip().lower()
+        if status in {
+            STATUS_IMPLEMENTED,
+            STATUS_DESIGNED,
+            STATUS_PLANNED,
+            STATUS_UNCERTAIN,
+        }:
+            return status
+        return STATUS_IMPLEMENTED
+
+    def _build_constraint_metadata(
+        self,
+        evidence: list[RetrievedEvidence],
+        resume_bullets: list[str],
+    ) -> dict:
+        can_write: list[str] = []
+        needs_confirmation: list[str] = []
+        learning_plan: list[str] = []
+        warnings: list[str] = []
+        bullet_evidence_map: list[dict[str, str]] = []
+
+        for ev, bullet in zip(evidence, resume_bullets):
+            status = self._evidence_status(ev)
+            bullet_evidence_map.append({
+                "bullet": bullet,
+                "evidence_id": ev.evidence_id,
+                "source_path": ev.source_path,
+                "status": status,
+            })
+            if status == STATUS_IMPLEMENTED:
+                can_write.append(bullet)
+            elif status == STATUS_DESIGNED:
+                needs_confirmation.append(bullet)
+                warnings.append(
+                    f"evidence {ev.evidence_id} 状态为 designed，需要用户确认后才能作为简历经历使用"
+                )
+            else:
+                learning_plan.append(bullet)
+                warnings.append(
+                    f"evidence {ev.evidence_id} 状态为 {status}，不能直接写入简历，只能作为学习计划或补强建议"
+                )
+
+        return {
+            "can_write_claims": can_write,
+            "needs_confirmation_claims": needs_confirmation,
+            "learning_plan_claims": learning_plan,
+            "warnings": warnings,
+            "bullet_evidence_map": bullet_evidence_map,
+        }

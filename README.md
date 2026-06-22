@@ -52,6 +52,16 @@
 - 浏览器插件只读取当前页面文本并辅助生成分析、话术和简历建议；复制、发送、投递动作必须由用户确认。
 - 本地上传、投递记录、知识库索引、生成 PDF 和诊断报告属于运行产物，默认不提交到 Git。
 
+## 可信生成与证据约束
+
+项目默认把最终输出分成三类：
+
+- 可以直接写进简历 / 沟通话术的内容：来自 `implemented` evidence，并带 evidence/source。
+- 需要用户确认后才能使用的内容：来自 `designed` evidence，默认加入 warnings 和 `approval_required`。
+- 只能作为学习计划或补强建议的内容：来自 `planned` / `uncertain` evidence，不能直接写成真实经历。
+
+`FaithfulnessChecker` 会检查生成 bullet 是否有 evidence 绑定；如果检查不通过，`AgentRunResult` 会暴露 warnings 并要求用户确认。
+
 ## 当前状态
 
 ### 已完成

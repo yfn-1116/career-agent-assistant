@@ -51,7 +51,7 @@ Phase 2：稳定可演示的 Internship Copilot 原型整理
 | DOC | DOC-SYNC-002 | Phase 2 项目状态文档同步 | Codex | IN_PROGRESS | README / overview / planning / journal / AGENTS 同步 |
 | REFACTOR | STREAMLIT-001 | Streamlit demo 薄 UI 拆分 | Codex | DONE | 上传、知识库、投递记录、GitHub 读取迁出到 service/repository |
 | SERVICE | SERVICE-001 | AgentRunService 统一入口收敛 | Codex | DONE | 新增 analyze_job / discover_jobs / generate_message / generate_resume_suggestions / chat_about_job / save_application |
-| EVIDENCE | EVIDENCE-001 | 最终输出证据约束增强 | Codex | NEXT | warnings / approval_required / 可写与需确认内容 |
+| EVIDENCE | EVIDENCE-001 | 最终输出证据约束增强 | Codex | DONE | can_write / needs_confirmation / learning_plan / warnings / approval_required |
 | TEST | E2E-001 | 演示链路端到端测试补强 | Codex | NEXT | AgentRunService / Browser API / Streamlit service / CLI |
 
 ## 建议任务顺序
@@ -82,8 +82,8 @@ Phase 2：稳定可演示的 Internship Copilot 原型整理
 24. DOC-SYNC-002 Phase 2 项目状态文档同步。
 25. ~~STREAMLIT-001 Streamlit demo 薄 UI 拆分。~~ ✅
 26. ~~SERVICE-001 AgentRunService 统一入口收敛。~~ ✅
-27. EVIDENCE-001 最终输出证据约束增强。← 当前优先
-28. E2E-001 演示链路端到端测试补强。
+27. ~~EVIDENCE-001 最终输出证据约束增强。~~ ✅
+28. E2E-001 演示链路端到端测试补强。← 当前优先
 
 ## 分工建议
 

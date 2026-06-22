@@ -260,6 +260,22 @@ class AgentRunService:
 
         # Communication script
         comm = gr.communication_message if gr is not None else ""
+        output_meta = gr.metadata if gr is not None and isinstance(gr.metadata, dict) else {}
+        warnings.extend(str(w) for w in output_meta.get("warnings", []))
+        can_write_claims = list(output_meta.get("can_write_claims", []))
+        needs_confirmation = list(output_meta.get("needs_confirmation_claims", []))
+        learning_plan = list(output_meta.get("learning_plan_claims", []))
+        cannot_write_claims = needs_confirmation + learning_plan
+
+        faithfulness = state.get("faithfulness_report")
+        approval_required = bool(cannot_write_claims)
+        if faithfulness is not None and getattr(faithfulness, "decision", "") != "pass":
+            approval_required = True
+            warnings.append(
+                f"Faithfulness check requires revision: score={getattr(faithfulness, 'faithfulness_score', 0):.2f}"
+            )
+        if warnings:
+            approval_required = True
 
         # Retrieval grade
         rs = state.get("retrieval_scores")
@@ -299,13 +315,26 @@ class AgentRunService:
             generated_bullets=bullets,
             communication_script=comm,
             evidence_sources=sources,
+            can_write_claims=can_write_claims,
+            cannot_write_claims=cannot_write_claims,
             retrieval_grade=grade,
             retrieval_total_score=total,
             retry_count=state.get("retry_count", 0),
             decision=state["decision"],
             report_path=state.get("report_path", ""),
+            approval_required=approval_required,
             status=state["status"],
             warnings=warnings,
+            metadata={
+                "needs_confirmation_claims": needs_confirmation,
+                "learning_plan_claims": learning_plan,
+                "output_constraints": output_meta,
+                "faithfulness_report": (
+                    faithfulness.to_dict()
+                    if faithfulness is not None and hasattr(faithfulness, "to_dict")
+                    else None
+                ),
+            },
         )
 
     @staticmethod

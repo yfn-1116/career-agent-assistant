@@ -36,6 +36,16 @@ def _make_evidence(
     )
 
 
+def _make_evidence_with_status(status: str) -> RetrievedEvidence:
+    evidence = _make_evidence(
+        evidence_id=f"ev-{status}",
+        title=f"{status} 项目",
+        content="设计了 LangGraph RAG workflow，后续计划继续补强部署。",
+    )
+    evidence.metadata["status"] = status
+    return evidence
+
+
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
@@ -118,6 +128,45 @@ class TestWithoutEvidence:
         # Should not mention any project names
         joined = " ".join(output.resume_bullets)
         assert "RAG 知识库项目" not in joined
+
+
+class TestEvidenceStatusConstraints:
+    def test_planned_evidence_is_not_direct_resume_claim(self):
+        agent = BuildAgent()
+        output = agent.build(
+            ParsedJD(job_title="AI Agent 实习生"),
+            [_make_evidence_with_status("planned")],
+            MatchAnalysisResult(),
+        )
+
+        assert output.metadata["can_write_claims"] == []
+        assert output.metadata["learning_plan_claims"]
+        assert output.metadata["warnings"]
+        assert any("不能直接写入简历" in warning for warning in output.metadata["warnings"])
+
+    def test_designed_evidence_requires_confirmation(self):
+        agent = BuildAgent()
+        output = agent.build(
+            ParsedJD(job_title="AI Agent 实习生"),
+            [_make_evidence_with_status("designed")],
+            MatchAnalysisResult(),
+        )
+
+        assert output.metadata["needs_confirmation_claims"]
+        assert output.metadata["can_write_claims"] == []
+        assert any("需要用户确认" in warning for warning in output.metadata["warnings"])
+
+    def test_implemented_evidence_is_can_write_claim(self):
+        agent = BuildAgent()
+        output = agent.build(
+            ParsedJD(job_title="AI Agent 实习生"),
+            [_make_evidence_with_status("implemented")],
+            MatchAnalysisResult(),
+        )
+
+        assert output.metadata["can_write_claims"]
+        assert output.metadata["needs_confirmation_claims"] == []
+        assert output.metadata["learning_plan_claims"] == []
 
 
 class TestNoExternalDependencies:

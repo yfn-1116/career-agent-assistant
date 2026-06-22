@@ -36,6 +36,16 @@
 - 不做复杂账号系统和多用户知识库。
 - 不把本地上传文件、真实简历、投递记录、知识库索引提交到 Git。
 
+## 可信生成边界
+
+最终输出必须基于 evidence/source。当前实现会把生成内容分成：
+
+- `can_write_claims`：来自 `implemented` evidence，可以作为简历 bullet 或沟通话术候选。
+- `needs_confirmation_claims`：来自 `designed` evidence，需要用户确认后才能使用。
+- `learning_plan_claims`：来自 `planned` / `uncertain` evidence，只能作为学习计划或补强建议。
+
+如果 Faithfulness 检查失败或存在不可直接写入的内容，`AgentRunResult.approval_required` 会被置为 `true`，warnings 会暴露给 API / UI。
+
 ## 核心模块边界
 
 ### RAG 用户资料知识库

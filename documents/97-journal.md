@@ -2,6 +2,33 @@
 
 ## 2026-06-22
 
+### EVIDENCE-001 最终输出证据约束增强
+
+- Executor: Codex
+- Type: feature / safety / test
+- Summary:
+  - `BuildAgent` 根据 evidence metadata status 将生成 bullet 分成 `can_write_claims`、`needs_confirmation_claims`、`learning_plan_claims`。
+  - `implemented` evidence 可作为简历/话术候选；`designed` evidence 默认需要用户确认；`planned` / `uncertain` evidence 只能作为学习计划或补强建议，不能直接写入简历。
+  - `GeneratedOutput.metadata` 新增 warnings 和 `bullet_evidence_map`，每条 evidence 生成的 bullet 保留 evidence_id/source/status 映射。
+  - `AgentRunService` 将 BuildAgent warnings、不可直接写入内容和 Faithfulness revise_required 转换为 `AgentRunResult.warnings`、`approval_required`、`can_write_claims`、`cannot_write_claims`，供 API / UI 展示。
+  - README 和项目总览补充“可信生成与证据约束”说明，突出不编造经历的项目亮点。
+- Changed files:
+  - `src/career_agent/agents/build_agent.py`
+  - `src/career_agent/service/agent_run.py`
+  - `tests/agents/test_build_agent.py`
+  - `tests/service/test_agent_run.py`
+  - `README.md`
+  - `documents/00-project-overview.md`
+  - `documents/97-journal.md`
+  - `documents/99-project-planning.md`
+- Validation:
+  - `python -m pytest tests/agents/test_build_agent.py::TestEvidenceStatusConstraints -q` — 3 passed
+  - `python -m pytest tests/service/test_agent_run.py::TestAgentRunService::test_output_constraints_are_visible_in_result -q` — 1 passed
+  - `python -m pytest tests/agents/test_build_agent.py -q` — 20 passed
+  - `python -m pytest tests/service/test_agent_run.py -q` — 10 passed
+- Next:
+  - Run full test suite and add any missing end-to-end demo coverage.
+
 ### SERVICE-001 AgentRunService 统一入口收敛
 
 - Executor: Codex
