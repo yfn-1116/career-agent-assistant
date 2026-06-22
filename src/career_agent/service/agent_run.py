@@ -98,6 +98,109 @@ class AgentRunService:
         else:
             return self._run_analyze(request, output_dir)
 
+    def analyze_job(
+        self,
+        raw_jd: str,
+        *,
+        user_message: str = "",
+        output_dir: str = "outputs/demo",
+    ) -> AgentRunResult:
+        """Analyze one job posting through the canonical Agentic RAG path."""
+        return self.run(
+            AgentRunRequest(
+                user_message=user_message or raw_jd,
+                raw_jd=raw_jd,
+                mode="analyze_job",
+            ),
+            output_dir=output_dir,
+        )
+
+    def discover_jobs(
+        self,
+        text: str,
+        *,
+        output_dir: str = "outputs/demo",
+    ) -> AgentRunResult:
+        """Rank a pasted job-list page or batch of job postings."""
+        return self.run(
+            AgentRunRequest(user_message=text, mode="discover_jobs"),
+            output_dir=output_dir,
+        )
+
+    def generate_message(
+        self,
+        *,
+        job_title: str = "",
+        company: str = "",
+        matched_skills: list[str] | None = None,
+        strengths: list[str] | None = None,
+        evidence_paths: list[str] | None = None,
+        message_type: str = "boss_greeting",
+    ) -> AgentRunResult:
+        """Generate a user-reviewed communication draft."""
+        from career_agent.messages.agent import MessageAgent
+
+        draft = MessageAgent().generate(
+            message_type,
+            job_title=job_title,
+            company=company,
+            matched_skills=matched_skills or [],
+            strengths=strengths or [],
+            evidence_paths=evidence_paths or [],
+        )
+        return AgentRunResult(
+            trace_id=uuid.uuid4().hex[:12],
+            final_answer=f"**建议话术**：\n\n{draft.text}",
+            communication_script=draft.text,
+            message_draft=draft.to_dict(),
+            approval_required=bool(draft.risk_warnings),
+            warnings=list(draft.risk_warnings),
+            status="completed",
+        )
+
+    def generate_resume_suggestions(
+        self,
+        raw_jd: str,
+        *,
+        output_dir: str = "outputs/demo",
+    ) -> AgentRunResult:
+        """Generate resume bullets by reusing the same analyzed evidence path."""
+        result = self.analyze_job(raw_jd, output_dir=output_dir)
+        if result.generated_bullets:
+            result.final_answer = "\n".join(result.generated_bullets)
+        return result
+
+    def chat_about_job(
+        self,
+        message: str,
+        *,
+        output_dir: str = "outputs/demo",
+    ) -> AgentRunResult:
+        """Generate a user-reviewed HR reply suggestion."""
+        return self.run(
+            AgentRunRequest(user_message=message, hr_message=message, mode="handle_hr_reply"),
+            output_dir=output_dir,
+        )
+
+    def save_application(
+        self,
+        result: AgentRunResult,
+        *,
+        job_title: str,
+        company: str = "",
+        jd_text: str = "",
+        runtime_dir: str = "runtime",
+    ):
+        """Persist an application record through the application service."""
+        from career_agent.service.application_service import ApplicationService
+
+        return ApplicationService(runtime_dir=runtime_dir).save_from_agent_result(
+            result,
+            job_title=job_title,
+            company=company,
+            jd_text=jd_text,
+        )
+
     def _run_analyze(self, request: AgentRunRequest, output_dir: str) -> AgentRunResult:
         """Analyze a single job posting."""
         jd = request.raw_jd or request.user_message
@@ -305,11 +408,27 @@ class AgentRunService:
             lines.append(f"- 建议: {rj.recommended_action}")
             lines.append("")
 
+        ranked_payload = []
+        for rj in ranked[:5]:
+            jp = rj.job_posting
+            ranked_payload.append({
+                "job_title": jp.job_title if jp else "",
+                "company": jp.company if jp else "",
+                "location": jp.location if jp else "",
+                "match_score": rj.match_score,
+                "recommended_action": rj.recommended_action,
+                "matched_skills": list(rj.matched_skills),
+                "missing_skills": list(rj.missing_skills),
+                "reason_summary": rj.reason_summary,
+                "message_preview": rj.generated_message_preview,
+            })
+
         return AgentRunResult(
             trace_id=uuid.uuid4().hex[:12],
             final_answer="\n".join(lines),
             match_score=ranked[0].match_score if ranked else 0.0,
             recommended_action=ranked[0].recommended_action if ranked else "skip",
+            metadata={"ranked_jobs": ranked_payload},
             status="completed",
         )
 
@@ -341,6 +460,7 @@ class AgentRunService:
             trace_id=uuid.uuid4().hex[:12],
             final_answer=f"**建议回复**：\n\n{reply.suggested_reply}",
             communication_script=reply.suggested_reply,
+            message_draft=reply.to_dict(),
             approval_required=approval,
             warnings=reply.risk_warnings,
             status="completed",

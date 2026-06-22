@@ -68,3 +68,41 @@ class TestAgentRunService:
             result = svc.run(request, output_dir=tmp)
             assert result.trace_id
             assert result.final_answer or result.status == "fallback"
+
+    def test_convenience_analyze_job_entrypoint(self):
+        svc = AgentRunService(profile_dir=PROFILE_DIR)
+        with tempfile.TemporaryDirectory() as tmp:
+            result = svc.analyze_job(SAMPLE_JD, output_dir=tmp)
+            assert result.trace_id
+            assert result.status == "completed"
+            assert result.generated_bullets
+
+    def test_generate_message_entrypoint(self):
+        svc = AgentRunService(profile_dir=PROFILE_DIR)
+        result = svc.generate_message(
+            job_title="AI Agent 实习生",
+            matched_skills=["Python", "RAG"],
+        )
+        assert result.trace_id
+        assert result.message_draft is not None
+        assert "AI Agent" in result.communication_script
+
+    def test_chat_about_job_entrypoint(self):
+        svc = AgentRunService(profile_dir=PROFILE_DIR)
+        result = svc.chat_about_job("请问你什么时候可以到岗？")
+        assert result.trace_id
+        assert result.approval_required
+        assert result.message_draft is not None
+
+    def test_save_application_entrypoint(self):
+        svc = AgentRunService(profile_dir=PROFILE_DIR)
+        result = svc.generate_message(job_title="Backend Intern", matched_skills=["Python"])
+        with tempfile.TemporaryDirectory() as tmp:
+            record = svc.save_application(
+                result,
+                job_title="Backend Intern",
+                jd_text="Python backend intern",
+                runtime_dir=tmp,
+            )
+            assert record.application_id
+            assert record.job_title == "Backend Intern"

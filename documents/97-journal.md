@@ -2,6 +2,29 @@
 
 ## 2026-06-22
 
+### SERVICE-001 AgentRunService 统一入口收敛
+
+- Executor: Codex
+- Type: refactor / test / docs
+- Summary:
+  - 为 `AgentRunService` 增加 `analyze_job`、`discover_jobs`、`generate_message`、`generate_resume_suggestions`、`chat_about_job`、`save_application` 轻量入口。
+  - `discover_jobs` 现在在 `AgentRunResult.metadata["ranked_jobs"]` 暴露结构化岗位排序结果，供 API / UI 复用。
+  - HR 回复模式现在把 `ReplySuggestion.to_dict()` 写入 `message_draft`，方便 API 直接返回。
+  - Browser API 的 job detail / job list / chat 处理改为通过 `AgentRunService` 生成岗位分析、岗位排序、话术、HR 回复和投递记录。
+  - 更新数据流文档，明确 `UI / API / CLI / Browser Extension -> AgentRunService -> Workflow / RAG / Matching / Message / Repository` 的目标结构。
+- Changed files:
+  - `src/career_agent/service/agent_run.py`
+  - `src/career_agent/api/app.py`
+  - `tests/service/test_agent_run.py`
+  - `documents/02-design/05-data-flow-design.md`
+  - `documents/97-journal.md`
+  - `documents/99-project-planning.md`
+- Validation:
+  - `python -m pytest tests/service/test_agent_run.py -q` — 9 passed
+  - `python -m pytest tests/api/test_browser_api.py -q` — 4 passed, 2 existing PDF font deprecation warnings
+- Next:
+  - Strengthen Evidence Gate / Faithfulness constraints on final outputs.
+
 ### STREAMLIT-001 Streamlit demo 薄 UI 拆分
 
 - Executor: Codex

@@ -1,12 +1,11 @@
 """FastAPI Browser Assistant API — local agent service for Chrome extension."""
 
 from __future__ import annotations
-import uuid
 from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from career_agent.api.schemas import BrowserAgentResult, BrowserPageSnapshot
-from career_agent.service.agent_run import AgentRunRequest, AgentRunService
+from career_agent.service.agent_run import AgentRunService
 
 app = FastAPI(title="Smart Apply Browser API", version="1.3")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -72,7 +71,6 @@ def _classify_page(snapshot: BrowserPageSnapshot) -> str:
 def _handle_job_detail(snapshot: BrowserPageSnapshot) -> dict:
     from career_agent.job_sources.parser import JobPostingParser
     from career_agent.hiring_intent.analyzer import HiringIntentAnalyzer
-    from career_agent.messages.agent import MessageAgent
     from career_agent.resume.pdf_exporter import export_pdf
 
     parser = JobPostingParser()
@@ -80,14 +78,21 @@ def _handle_job_detail(snapshot: BrowserPageSnapshot) -> dict:
     ha = HiringIntentAnalyzer()
     intent = ha.analyze(jd_text=snapshot.text, hard_skills=posting.hard_skills, job_title=posting.job_title)
 
-    # Run main agent
-    req = AgentRunRequest(user_message=snapshot.text, raw_jd=snapshot.text, mode="analyze_job")
-    result = SVC.run(req)
+    result = SVC.analyze_job(snapshot.text, user_message=snapshot.text)
+    app_record = SVC.save_application(
+        result,
+        job_title=posting.job_title or "unknown",
+        company=posting.company,
+        jd_text=snapshot.text,
+    )
 
-    # Generate message
-    msg = MessageAgent().generate("boss_greeting", job_title=posting.job_title, matched_skills=posting.hard_skills[:3])
+    msg_result = SVC.generate_message(
+        job_title=posting.job_title,
+        company=posting.company,
+        matched_skills=posting.hard_skills[:3],
+        evidence_paths=result.evidence_sources,
+    )
 
-    # PDF resume
     pdf = export_pdf(f"outputs/resumes/{result.trace_id[:8]}.pdf",
                      profile_info={"name": "Candidate"}, match_result=result.match_summary,
                      generated_bullets=result.generated_bullets)
@@ -99,38 +104,17 @@ def _handle_job_detail(snapshot: BrowserPageSnapshot) -> dict:
         hiring_intent_score=intent.hiring_intent_score,
         opportunity_score=max(0, min(1, 0.5*result.match_score + 0.35*intent.hiring_intent_score - 0.2*intent.risk_score)),
         recommended_action=result.recommended_action or intent.recommended_action,
-        message_draft=msg.to_dict(),
+        message_draft=msg_result.message_draft,
         verification_questions=intent.verification_questions,
         resume_paths=[pdf],
+        application_record_id=app_record.application_id,
         next_action="copy_message_and_send",
     ).to_dict()
 
 
 def _handle_job_list(snapshot: BrowserPageSnapshot) -> dict:
-    from career_agent.job_sources.parser import JobPostingParser
-    from career_agent.discovery.ranker import JobRanker
-    from career_agent.profile.loader import ProfileLoader
-    from career_agent.rag.loaders.markdown_loader import MarkdownProfileLoader
-
-    parser = JobPostingParser()
-    postings = parser.parse_batch(snapshot.text)
-    loader = ProfileLoader()
-    md_loader = MarkdownProfileLoader()
-    docs = md_loader.load_directory(str(Path(__file__).resolve().parents[3] / "data" / "samples" / "profile"))
-    items = loader.load_documents(docs)
-
-    ranker = JobRanker()
-    ranked = ranker.rank(postings, items)
-
-    top = []
-    for rj in ranked[:5]:
-        jp = rj.job_posting
-        top.append({
-            "job_title": jp.job_title, "company": jp.company,
-            "match_score": rj.match_score, "recommended_action": rj.recommended_action,
-            "matched_skills": rj.matched_skills, "missing_skills": rj.missing_skills,
-            "reason_summary": rj.reason_summary, "message_preview": rj.generated_message_preview,
-        })
+    result = SVC.discover_jobs(snapshot.text)
+    top = list(result.metadata.get("ranked_jobs", []))
 
     return BrowserAgentResult(
         page_type="job_list", ranked_jobs=top,
@@ -140,14 +124,11 @@ def _handle_job_list(snapshot: BrowserPageSnapshot) -> dict:
 
 
 def _handle_chat(snapshot: BrowserPageSnapshot) -> dict:
-    from career_agent.conversation.reply import HRReplyAssistant
-
-    assistant = HRReplyAssistant()
-    reply = assistant.suggest(snapshot.text)
+    result = SVC.chat_about_job(snapshot.text)
 
     return BrowserAgentResult(
         page_type="chat",
-        reply_suggestion=reply.to_dict(),
+        reply_suggestion=result.message_draft,
         next_action="copy_reply_and_send",
-        warnings=["请确认回复内容后再发送", "不自动发送消息"],
+        warnings=["请确认回复内容后再发送", "不自动发送消息", *result.warnings],
     ).to_dict()
