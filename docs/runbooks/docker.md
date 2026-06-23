@@ -1,5 +1,17 @@
 # Docker 运行指南
 
+## 适用范围
+
+本文档只适用于本地开发机或普通云服务器 Docker 环境。
+
+**不要在当前学校展示服务器上使用 Docker Compose。** 学校服务器已经是老师启动好的 Docker/Jupyter 容器，外部端口也已经映射完成：
+
+- FastAPI：容器内 `8080` -> 外部 `8023`
+- Streamlit：容器内 `8082` -> 外部 `8024`
+- Jupyter：容器内 `8206` -> 外部 `8206`
+
+学校服务器部署请使用 `documents/98-runbook/03-school-server-deploy.md`，不要执行 `docker compose up --build`。
+
 ## 前置条件
 
 - Docker 已安装

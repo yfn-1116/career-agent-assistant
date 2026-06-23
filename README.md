@@ -98,8 +98,20 @@ python demo/cli/run_job_match_demo.py
 # 查看输出
 cat outputs/demo/job_match_result.md
 
-# 启动 Streamlit demo
+# 启动 Streamlit demo（Chat-first 对话式界面）
 streamlit run demo/streamlit/app.py
+
+# 服务器端口 8082 启动
+python -m streamlit run demo/streamlit/app.py \
+  --server.address 0.0.0.0 --server.port 8082 --server.headless true
+```
+
+Docker 部署（前端 + 后端一起启动）：
+
+```bash
+docker compose up --build
+# Streamlit: http://localhost:8501
+# FastAPI Swagger: http://localhost:8000/docs
 ```
 
 本地 API / 浏览器插件：
@@ -117,6 +129,14 @@ uvicorn career_agent.api.app:app --reload
 # 3. Load unpacked -> 选择 browser_extension/
 # 4. 在岗位详情、岗位列表或聊天页面点击 Analyze Current Page
 ```
+
+学校服务器展示：
+
+- 不使用 Docker Compose。
+- 在老师已经启动好的 Jupyter 容器内直接运行服务。
+- FastAPI 使用容器内 `8080`，外部访问 `http://218.197.18.192:8023/docs`。
+- Streamlit 使用容器内 `8082`，外部访问 `http://218.197.18.192:8024`。
+- 详细部署命令见 `documents/98-runbook/03-school-server-deploy.md`。
 
 评估 runner：
 
@@ -147,7 +167,10 @@ src/career_agent/
 
 demo/
 ├── cli/           # CLI demo 入口
-└── streamlit/     # Streamlit 可视化 demo
+└── streamlit/     # Chat-first Streamlit 对话式 Agent 工作台
+    ├── app.py         # 主入口，Chat-first 布局 + intent routing
+    ├── styles.py      # 极简 CSS（单 accent 色，大量留白）
+    └── ui_components.py  # 纯 UI 渲染函数（消息流/Evidence/指标卡）
 
 browser_extension/ # Chrome side panel demo
 
@@ -225,12 +248,12 @@ FastAPI routes
 ✅ AgentTaskState → 核心 Agent
 ✅ Workflow 集成
 ✅ CLI demo
-✅ Streamlit demo
+✅ Streamlit demo → Chat-first 对话式 Agent 工作台
 ✅ LangGraph workflow 原型
 ✅ FastAPI / Browser Extension demo
+✅ Docker 前后端一起部署
+✅ 知识库可视化 & 中文界面
 ✅ 学校服务器部署文档
-⏳ 收敛 Streamlit 为薄 UI
-⏳ 加深 Evidence Gate / Faithfulness 对最终输出的约束
 ⏳ 增强端到端演示测试
 ```
 

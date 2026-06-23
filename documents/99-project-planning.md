@@ -42,7 +42,7 @@ Phase 2：稳定可演示的 Internship Copilot 原型整理
 | WORKFLOW | WORKFLOW-001 | Agent workflow 集成 | Claude Code + DeepSeek | DONE | 串联 4 Agent，11 tests，140 total |
 | DEMO | DEMO-001 | CLI demo | Claude Code + DeepSeek | DONE | CLI + Markdown 报告，10 smoke tests |
 | DEMO | DEMO-002 | Streamlit demo | Claude Code + DeepSeek | DONE | 轻量可视化，15 static tests |
-| DEPLOY | DEPLOY-001 | 学校服务器部署文档 | Claude Code + DeepSeek | DONE | CLI+Streamlit 部署，checklist |
+| DEPLOY | DEPLOY-001 | 学校服务器部署文档 | Claude Code + DeepSeek | DONE | 已同步实际 Jupyter 容器部署：FastAPI 8080->8023，Streamlit 8082->8024，不使用 Docker Compose |
 | WORKFLOW | WORKFLOW-002 | LangGraph workflow 集成 | Codex | DONE | LangGraph StateGraph 已实现，保留 Python workflow 兼容 |
 | RAG | RAG-006 | 检索评分与诊断报告 | Codex | DONE | RetrievalGradeReport 已实现，规则型评分 |
 | DEMO | DEMO-003 | RAG 检索诊断展示 | Claude Code + DeepSeek | DONE | CLI + Streamlit 展示 query/grade/evidence |

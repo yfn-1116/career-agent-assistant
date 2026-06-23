@@ -6,6 +6,7 @@ services:
     image: smart-apply-agent:latest
     ports:
       - "${STREAMLIT_PORT:-8501}:8501"
+      - "${FASTAPI_PORT:-8000}:8000"
     volumes:
       - ./data:/app/data
       - ./outputs:/app/outputs
@@ -13,4 +14,6 @@ services:
       - .env
     environment:
       - APP_ENV=${APP_ENV:-docker}
+      - FASTAPI_PORT=${FASTAPI_PORT:-8000}
+      - STREAMLIT_PORT=${STREAMLIT_PORT:-8501}
     restart: unless-stopped

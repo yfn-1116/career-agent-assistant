@@ -14,3 +14,5 @@
 ## 适用阶段
 
 当前为 Phase 2（Internship Copilot 原型整理）。运行手册覆盖 CLI demo、Streamlit demo、学校服务器展示和本地问题排查；FastAPI / Browser Extension 的使用说明见 `docs/runbooks/browser_assistant_usage.md`。
+
+学校服务器的实际展示环境是老师已经启动好的 Docker/Jupyter 容器，不使用 Docker Compose。该环境固定使用容器内 `8080` 跑 FastAPI、容器内 `8082` 跑 Streamlit，对外分别映射到 `8023` 和 `8024`。详细步骤见 `03-school-server-deploy.md`。

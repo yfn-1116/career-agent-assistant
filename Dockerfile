@@ -15,8 +15,11 @@ RUN pip install --no-cache-dir -e ".[demo]"
 COPY src/ src/
 COPY demo/ demo/
 COPY data/ data/
+COPY startup.sh startup.sh
+RUN chmod +x startup.sh
 
-# Default: Streamlit demo
-EXPOSE 8501
-CMD ["streamlit", "run", "demo/streamlit/app.py", \
-     "--server.address=0.0.0.0", "--server.port=8501"]
+# Expose both FastAPI backend and Streamlit frontend
+EXPOSE 8000 8501
+
+# Run both services via startup script
+CMD ["./startup.sh"]

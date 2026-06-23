@@ -1,5 +1,120 @@
 # 项目日志
 
+## 2026-06-23
+
+### UI-003 Chat-first 中文界面优化
+
+- Executor: Claude Code
+- Type: ui / streamlit / i18n
+- Summary:
+  - 将 Streamlit UI 从"表单+按钮+卡片"改为纯 Chat-first 对话式 Agent 工作台。
+  - 全面中文化：标题、按钮、指标标签、证据分类、pipeline 说明全部改为中文。
+  - 主对话区不再默认展开 Sources / Applications / KB stats，改为侧边栏精简展示 + 折叠查看。
+  - 证据展示默认折叠为一行摘要（"本次生成基于 N 条可写入简历的证据"），点击 expander 查看详情。
+  - Applications 移到侧边栏"最近投递"（最近 3 条），完整列表折叠。
+  - 增强中文 intent routing：新增"匹配""适合我吗""帮我看看""分析一下""我的技能""个人画像"等关键词。
+  - 移除 CSS `text-transform: uppercase` 避免中文显示异常。
+- Changed files:
+  - `demo/streamlit/app.py`
+  - `demo/streamlit/ui_components.py`
+  - `demo/streamlit/styles.py`
+- Validation:
+  - `python -m pytest -q` — 554 passed
+  - 浏览器验证：中文输入正常、intent routing 正确识别、Chat-first 流程完整
+- Next:
+  - 答辩准备
+
+### UI-002 Chat-first + Knowledge Base 可视化
+
+- Executor: Claude Code
+- Type: ui / streamlit / knowledge-base
+- Summary:
+  - 将 Streamlit UI 从表单风格改为 Chat-first Agent Workspace（类似 ChatGPT/DeepSeek/Cowork）。
+  - 主交互改为 `st.chat_input` 一句话触发，支持 JD 分析、HR 话术、简历建议、个人画像查询、GitHub 链接导入。
+  - 轻量 intent routing（关键词规则，无 LLM router），6 种意图自动路由。
+  - 新增 KnowledgeBaseService 只读方法：`get_summary()`, `get_source_details()`, `get_profile_text()`。
+  - 新增消息类型系统：analysis/profile/message/github_ingest，每种有独立渲染逻辑。
+  - Agent 回复内嵌 metric 卡片、resume bullets、HR message card、evidence gate（默认折叠）。
+  - 空状态类似 ChatGPT 欢迎页，无消息时不堆卡片。
+- Changed files:
+  - `demo/streamlit/app.py`
+  - `demo/streamlit/ui_components.py`
+  - `demo/streamlit/styles.py`
+  - `src/career_agent/service/knowledge_base.py`
+  - `tests/demo/test_streamlit_app_static.py`
+- Validation:
+  - `python -m pytest -q` — 554 passed
+  - 浏览器验证：Chat-first 流程完整、KB profile 查询正确、JD 分析结果内嵌展示
+- Next:
+  - UI-003 中文化 + 主对话区精简
+
+### UI-001 Streamlit 极简 Agent 工作台风格
+
+- Executor: Claude Code
+- Type: ui / streamlit / design
+- Summary:
+  - 将 Streamlit 从"组件堆叠"优化为极简 Agent 工作台风格（类似 Cowork/Claude Workspace）。
+  - 单一 accent 色 #4F5FD7，大量留白，max-width 860px，白卡片 + 细边框。
+  - 页面结构：Hero → 大居中输入 → 结果区（Metrics / Resume / Message / Evidence / Applications）。
+  - 新增 `styles.py`（CSS 注入）和 `ui_components.py`（纯 UI 渲染函数）。
+  - 保留所有 AgentRunService / KnowledgeBaseService / ApplicationService 调用，不改核心逻辑。
+  - "Load Sample JD" 一键填充样例 AI Agent Intern JD。
+- Changed files:
+  - `demo/streamlit/app.py`
+  - `demo/streamlit/styles.py` (NEW)
+  - `demo/streamlit/ui_components.py` (NEW)
+  - `tests/demo/test_streamlit_app_static.py`
+- Validation:
+  - `python -m pytest -q` — 554 passed
+  - 浏览器验证：完整流程（Load JD → Analyze → Results）正常渲染
+- Next:
+  - UI-002 Chat-first 对话式交互
+
+### DOCKER-001 Docker 前后端一起部署
+
+- Executor: Claude Code
+- Type: deployment / docker
+- Summary:
+  - 修改 Dockerfile 同时启动 FastAPI（8000）+ Streamlit（8501），使用 startup.sh 管理双进程。
+  - 更新 docker-compose.yml 暴露双端口。
+  - 新增 startup.sh 启动脚本。
+- Changed files:
+  - `Dockerfile`
+  - `docker-compose.yml`
+  - `startup.sh` (NEW)
+- Validation:
+  - `docker compose up --build` 可同时访问 Streamlit :8501 和 FastAPI :8000/docs
+- Next:
+  - 学校服务器部署（不使用 Docker Compose，直接 Python 启动）
+
+### DEPLOY-001 学校服务器实际部署方式同步
+
+- Executor: Codex
+- Type: docs / deployment
+- Summary:
+  - 将学校服务器部署文档从通用服务器说明更新为实际环境说明：老师已启动的 Docker/Jupyter 容器，登录目录 `/data/pytorch`，项目目录 `/data/pytorch/career-agent-assistant`。
+  - 明确学校服务器不使用 Docker Compose，不执行 `docker compose up --build`。
+  - 固化端口映射：Jupyter `8206 -> 8206`，FastAPI 容器内 `8080 -> 外部 8023`，Streamlit 容器内 `8082 -> 外部 8024`。
+  - 补充 FastAPI / Streamlit 启动命令、健康检查、外部访问地址、日志查看、停止服务、Git 冲突处理。
+  - 在 runbook 中加入服务器本地 `start_demo.sh` 和 `update_and_start.sh` 创建片段，作为后续展示部署脚本的标准来源。
+  - 同步 checklist、troubleshooting、Docker runbook、Browser Assistant runbook、README、任务卡和规划文档，避免继续使用学校服务器不适用的 `8000` / `8501` / Docker Compose 指引。
+- Changed files:
+  - `README.md`
+  - `documents/98-runbook/03-school-server-deploy.md`
+  - `documents/98-runbook/04-troubleshooting.md`
+  - `documents/98-runbook/05-server-demo-checklist.md`
+  - `documents/98-runbook/README.md`
+  - `docs/runbooks/browser_assistant_usage.md`
+  - `docs/runbooks/docker.md`
+  - `docs/superpowers/tasks/DEPLOY-001-school-server-deploy-docs.md`
+  - `documents/97-journal.md`
+  - `documents/99-project-planning.md`
+- Validation:
+  - `rg -n "8501|8000|docker compose|docker-compose|8023|8024|8080|8082|8765" README.md documents/98-runbook docs/runbooks docs/superpowers/tasks/DEPLOY-001-school-server-deploy-docs.md` — reviewed results; school-server docs now use `8080` / `8082` and external `8023` / `8024`, while remaining `8000` / `8501` / Docker Compose references are local/Docker-only guidance or explicit "do not use on school server" warnings.
+  - `find documents/98-runbook docs/runbooks -name '*.md' -type f -empty -print` — no empty Markdown files.
+- Next:
+  - Future deployment scripts and docs for the school server should follow this container-internal direct-run model.
+
 ## 2026-06-22
 
 ### API-001 FastAPI 后端分层重构

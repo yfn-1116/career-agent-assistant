@@ -2,134 +2,405 @@
 
 ## 1. 部署目标
 
-- 项目在本地电脑开发，通过 GitHub 同步
-- 学校服务器通过 `git clone` / `git pull` 获取项目
-- 服务器用于展示 CLI demo（默认）或 Streamlit demo（可选）
-- **不部署生产服务**，不配置数据库或消息队列
+学校服务器用于展示 `career-agent-assistant` 原型，不作为生产环境使用。
 
-## 2. 环境要求
+实际部署方式是：**在老师已经启动好的 Docker/Jupyter 容器内直接运行 FastAPI 和 Streamlit**。不要在该环境里优先使用 Docker Compose，也不要再套一层 Docker 容器。
 
-| 依赖 | 版本要求 | 说明 |
-|---|---|---|
-| Python | 3.10+ | 过低版本可能语法不兼容 |
-| Git | 任意 | 用于 clone 和 pull |
-| pip | 任意 | 安装项目与可选 demo 依赖 |
-| pytest | 最新 | 用于运行测试 |
-| streamlit | 1.30+（可选） | 通过 `python -m pip install -e ".[demo]"` 安装 |
-
-**不依赖**：GPU、外部大模型 API、数据库、Redis、Docker。
-
-## 3. 首次部署步骤
-
-```bash
-# 1. 克隆仓库
-git clone https://github.com/yfn-1116/career-agent-assistant.git
-cd career-agent-assistant
-
-# 2. 创建虚拟环境（推荐）
-python3 -m venv .venv
-source .venv/bin/activate
-
-# 3. 安装项目依赖
-python -m pip install -e .
-
-# 4. 运行全部测试确认环境正常
-pytest tests -q
-# 预期约 165 个测试全部通过
-```
-
-## 4. 运行 CLI demo（默认展示方式）
-
-```bash
-python demo/cli/run_job_match_demo.py
-```
-
-终端输出：
+核心流程：
 
 ```text
-任务状态：completed
-岗位方向：agent
-检索证据：5 条
-输出文件：outputs/demo/job_match_result.md
-Done.
+本地修改代码
+-> git add / commit / push
+-> 学校服务器 git pull
+-> pip install -e .
+-> 重启 FastAPI 和 Streamlit
+-> 打开 8023 / 8024 展示
 ```
 
-查看输出：
+服务器只用于展示，原则上不在服务器上修改代码。
+
+## 2. 实际服务器环境
+
+| 项 | 值 |
+|---|---|
+| 当前登录目录 | `/data/pytorch` |
+| 项目目录 | `/data/pytorch/career-agent-assistant` |
+| 容器 hostname | `team1-192` |
+| 当前用户 | `user` |
+| Jupyter 外部地址 | `http://218.197.18.192:8206/tree` |
+
+当前环境不是普通云服务器，而是老师预先分配并启动好的容器。外部端口已经由老师映射到容器内部端口。
+
+## 3. 端口映射
+
+| 服务 | 容器内端口 | 外部端口 | 外部访问地址 |
+|---|---:|---:|---|
+| Jupyter | 8206 | 8206 | `http://218.197.18.192:8206/tree` |
+| FastAPI | 8080 | 8023 | `http://218.197.18.192:8023/docs` |
+| FastAPI Health | 8080 | 8023 | `http://218.197.18.192:8023/api/health` |
+| Streamlit | 8082 | 8024 | `http://218.197.18.192:8024` |
+
+因此学校服务器部署时不要使用默认端口 `8000` / `8501`。服务必须监听：
+
+```text
+FastAPI:   0.0.0.0:8080
+Streamlit: 0.0.0.0:8082
+```
+
+## 4. 不使用 Docker Compose
+
+在当前服务器环境中执行：
 
 ```bash
-cat outputs/demo/job_match_result.md
+docker compose version
 ```
 
-## 5. 运行 Streamlit demo（可选可视化展示）
+会报：
 
-### 安装
+```text
+docker: 'compose' is not a docker command.
+```
+
+所以学校服务器部署不要使用：
 
 ```bash
-python -m pip install -e ".[demo]"
+docker compose up --build
 ```
 
-### 启动
+原因：
+
+- 当前已经在老师分配好的容器里；
+- 外部端口已经由老师映射好；
+- 再在容器里套 Docker 容器会增加复杂度；
+- 容器内再映射端口容易导致外部无法访问。
+
+Docker Compose 文档只适用于本地或普通云服务器，不适用于当前学校展示服务器。
+
+## 5. 首次拉取项目
 
 ```bash
-streamlit run demo/streamlit/app.py --server.address 0.0.0.0 --server.port 8501
+cd /data/pytorch
+git clone https://github.com/yfn-1116/career-agent-assistant.git
+cd career-agent-assistant
 ```
 
-启动后终端会显示访问地址（如 `http://<服务器IP>:8501`）。
+安装项目依赖：
 
-### 端口说明
+```bash
+cd /data/pytorch/career-agent-assistant
+pip install -e .
+```
 
-- 默认端口 8501
-- 如果服务器端口未开放，**外部无法访问**
-- 可以先在本机或内网访问：`http://localhost:8501`
-- 若学校服务器有防火墙限制，联系管理员开放端口，或使用 SSH 端口转发：
+项目主要通过 `pyproject.toml` 管理依赖，没有 `requirements.txt`。此前已验证 `pip install -e .` 可以成功安装核心依赖，包括 FastAPI、uvicorn、LangGraph 等。
 
-  ```bash
-  # 在本地电脑执行，将服务器 8501 转发到本地 8501
-  ssh -L 8501:localhost:8501 user@server-ip
-  # 然后本地浏览器访问 http://localhost:8501
-  ```
+如果 Streamlit 不存在，额外安装：
 
-- **不要把 token、密钥写入仓库**
+```bash
+pip install streamlit pandas
+```
+
+建议使用 `python -m streamlit` 启动，不直接依赖 `streamlit` 命令是否在 PATH 中。
 
 ## 6. 后续更新
 
 ```bash
-cd career-agent-assistant
+cd /data/pytorch/career-agent-assistant
 git pull
-source .venv/bin/activate  # 如果使用虚拟环境
-python -m pip install -e .
-pytest tests -q
-
-# 确认测试通过后运行 demo
-python demo/cli/run_job_match_demo.py
+pip install -e .
 ```
 
-## 7. 展示给老师或同学
+如果本地代码已 push 到 GitHub，服务器只需要 `git pull`、重新安装 editable package，然后重启 FastAPI 和 Streamlit。
 
-### 展示要点
+## 7. 启动 FastAPI 后端
 
-1. 这是一个**实习求职智能投递辅助 Agent 原型**
-2. 输入：用户 Markdown 个人能力资料 + 岗位 JD
-3. 输出：JD 解析 → RAG 检索 → 匹配分析 → 简历 bullet + 沟通话术
-4. 当前使用**规则和模板**，不调用外部大模型，**保证可复现**
-5. 后续可接入 DeepSeek API 升级为 LLM 驱动
+FastAPI 必须跑在容器内部 `8080`，因为外部 `8023` 映射到容器内部 `8080`。
 
-### 建议展示流程
+```bash
+cd /data/pytorch/career-agent-assistant
 
-**方案 A：CLI demo（稳定）**
+mkdir -p runtime outputs
 
-1. `cat data/samples/profile/resume.md` — 展示样例用户资料
-2. `cat data/samples/jobs/agent_intern_jd.md` — 展示样例 JD
-3. `python demo/cli/run_job_match_demo.py` — 运行
-4. `cat outputs/demo/job_match_result.md` — 逐段讲解输出
+nohup python -m uvicorn career_agent.api.app:app \
+  --host 0.0.0.0 \
+  --port 8080 \
+  > outputs/api.log 2>&1 &
+```
 
-**方案 B：Streamlit demo（可视化）**
+检查：
 
-1. 启动 Streamlit：同上命令
-2. 浏览器打开页面
-3. 选择示例 JD → 点击运行 → 逐区域展示结果
-4. 如果 Streamlit 启动失败，回退到方案 A
+```bash
+curl -i http://127.0.0.1:8080/api/health
+curl -i http://127.0.0.1:8080/docs
+```
 
-## 8. 展示前检查清单
+健康检查正常返回：
 
-参见 `05-server-demo-checklist.md`。
+```json
+{"status":"ok","version":"1.3","service_name":"Internship Copilot API"}
+```
+
+外部访问：
+
+```text
+http://218.197.18.192:8023/docs
+http://218.197.18.192:8023/api/health
+```
+
+注意：`curl http://127.0.0.1:8080/` 返回 `404` 是正常的，因为项目没有定义根路径 `/`，真正的健康检查是 `/api/health`。
+
+## 8. 启动 Streamlit 前端
+
+Streamlit 必须跑在容器内部 `8082`，因为外部 `8024` 映射到容器内部 `8082`。
+
+```bash
+cd /data/pytorch/career-agent-assistant
+
+mkdir -p runtime outputs
+
+nohup python -m streamlit run demo/streamlit/app.py \
+  --server.address 0.0.0.0 \
+  --server.port 8082 \
+  --server.headless true \
+  --browser.gatherUsageStats false \
+  > outputs/streamlit.log 2>&1 &
+```
+
+检查：
+
+```bash
+curl -i http://127.0.0.1:8082
+```
+
+外部访问：
+
+```text
+http://218.197.18.192:8024
+```
+
+如果 Streamlit 启动失败并出现 `Exit 127`，通常表示 `streamlit` 命令不存在。安装后重试：
+
+```bash
+pip install streamlit pandas
+python -m streamlit run demo/streamlit/app.py \
+  --server.address 0.0.0.0 \
+  --server.port 8082 \
+  --server.headless true \
+  --browser.gatherUsageStats false
+```
+
+## 9. 一键启动脚本
+
+可在服务器项目目录创建 `start_demo.sh`：
+
+```bash
+cd /data/pytorch/career-agent-assistant
+
+cat > start_demo.sh <<'EOF'
+#!/usr/bin/env bash
+set -e
+
+cd /data/pytorch/career-agent-assistant
+
+mkdir -p runtime outputs
+
+echo "=== Stop old services if any ==="
+pkill -f "uvicorn career_agent.api.app:app" || true
+pkill -f "streamlit run demo/streamlit/app.py" || true
+
+echo "=== Start FastAPI on container port 8080 ==="
+nohup python -m uvicorn career_agent.api.app:app \
+  --host 0.0.0.0 \
+  --port 8080 \
+  > outputs/api.log 2>&1 &
+
+echo "=== Start Streamlit on container port 8082 ==="
+nohup python -m streamlit run demo/streamlit/app.py \
+  --server.address 0.0.0.0 \
+  --server.port 8082 \
+  --server.headless true \
+  --browser.gatherUsageStats false \
+  > outputs/streamlit.log 2>&1 &
+
+sleep 3
+
+echo "=== FastAPI health ==="
+curl -s http://127.0.0.1:8080/api/health || true
+
+echo ""
+echo "=== Listening ports ==="
+ss -lntp | grep -E ':8080|:8082' || true
+
+echo ""
+echo "=== Visit links ==="
+echo "Jupyter:          http://218.197.18.192:8206/tree"
+echo "FastAPI Swagger:  http://218.197.18.192:8023/docs"
+echo "FastAPI Health:   http://218.197.18.192:8023/api/health"
+echo "Streamlit Demo:   http://218.197.18.192:8024"
+EOF
+
+chmod +x start_demo.sh
+```
+
+以后启动：
+
+```bash
+cd /data/pytorch/career-agent-assistant
+./start_demo.sh
+```
+
+## 10. 一键更新并启动脚本
+
+如果本地代码修改后已经 push 到 GitHub，服务器只需要 pull 并重启。可在服务器项目目录创建 `update_and_start.sh`：
+
+```bash
+cd /data/pytorch/career-agent-assistant
+
+cat > update_and_start.sh <<'EOF'
+#!/usr/bin/env bash
+set -e
+
+cd /data/pytorch/career-agent-assistant
+
+echo "=== Git status before pull ==="
+git status --short
+
+echo "=== Pull latest code ==="
+git pull
+
+echo "=== Install editable package ==="
+pip install -e .
+
+echo "=== Stop old services if any ==="
+pkill -f "uvicorn career_agent.api.app:app" || true
+pkill -f "streamlit run demo/streamlit/app.py" || true
+
+mkdir -p runtime outputs
+
+echo "=== Start FastAPI on container port 8080 ==="
+nohup python -m uvicorn career_agent.api.app:app \
+  --host 0.0.0.0 \
+  --port 8080 \
+  > outputs/api.log 2>&1 &
+
+echo "=== Start Streamlit on container port 8082 ==="
+nohup python -m streamlit run demo/streamlit/app.py \
+  --server.address 0.0.0.0 \
+  --server.port 8082 \
+  --server.headless true \
+  --browser.gatherUsageStats false \
+  > outputs/streamlit.log 2>&1 &
+
+sleep 3
+
+echo "=== FastAPI health ==="
+curl -s http://127.0.0.1:8080/api/health || true
+
+echo ""
+echo "=== Listening ports ==="
+ss -lntp | grep -E ':8080|:8082' || true
+
+echo ""
+echo "=== Visit links ==="
+echo "Jupyter:          http://218.197.18.192:8206/tree"
+echo "FastAPI Swagger:  http://218.197.18.192:8023/docs"
+echo "FastAPI Health:   http://218.197.18.192:8023/api/health"
+echo "Streamlit Demo:   http://218.197.18.192:8024"
+EOF
+
+chmod +x update_and_start.sh
+```
+
+以后更新并启动：
+
+```bash
+cd /data/pytorch/career-agent-assistant
+./update_and_start.sh
+```
+
+## 11. 查看日志与状态
+
+查看后端日志：
+
+```bash
+tail -n 100 outputs/api.log
+```
+
+查看前端日志：
+
+```bash
+tail -n 100 outputs/streamlit.log
+```
+
+查看进程：
+
+```bash
+ps aux | grep -E 'uvicorn|streamlit'
+```
+
+查看端口：
+
+```bash
+ss -lntp | grep -E ':8080|:8082|:8206'
+```
+
+## 12. 停止服务
+
+```bash
+pkill -f "uvicorn career_agent.api.app:app" || true
+pkill -f "streamlit run demo/streamlit/app.py" || true
+```
+
+## 13. 如果出现 Git 冲突
+
+服务器只用于展示，原则上不在服务器改代码，所以一般不会冲突。
+
+先查看：
+
+```bash
+git status
+```
+
+如果确认服务器本地修改不要，可以恢复：
+
+```bash
+git restore .
+git pull
+```
+
+如果状态很乱，可以重新拉一份：
+
+```bash
+cd /data/pytorch
+mv career-agent-assistant career-agent-assistant.bak
+git clone https://github.com/yfn-1116/career-agent-assistant.git
+cd career-agent-assistant
+pip install -e .
+```
+
+然后重新启动 `8080` / `8082`。
+
+## 14. 最终部署逻辑总结
+
+```text
+不是 docker compose 部署
+而是在老师已经启动的容器内直接运行服务
+
+FastAPI:
+容器内 8080 -> 外部 8023
+
+Streamlit:
+容器内 8082 -> 外部 8024
+
+Jupyter:
+容器内 8206 -> 外部 8206
+```
+
+部署时只需要：
+
+```text
+git pull
+pip install -e .
+启动 uvicorn 到 8080
+启动 streamlit 到 8082
+打开 8023 / 8024
+```

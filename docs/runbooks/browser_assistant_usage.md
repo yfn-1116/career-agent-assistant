@@ -6,6 +6,24 @@
 uvicorn career_agent.api.app:app --host 127.0.0.1 --port 8765
 ```
 
+## 学校服务器访问
+
+学校展示服务器不使用本地 `8765` 端口。该服务器已经由老师完成端口映射：
+
+```text
+FastAPI:   容器内 8080 -> 外部 8023
+Streamlit: 容器内 8082 -> 外部 8024
+Jupyter:   容器内 8206 -> 外部 8206
+```
+
+学校服务器 FastAPI Swagger：
+
+```text
+http://218.197.18.192:8023/docs
+```
+
+学校服务器部署和启动命令见 `documents/98-runbook/03-school-server-deploy.md`。
+
 ## 加载 Chrome 插件
 
 1. Chrome → `chrome://extensions`

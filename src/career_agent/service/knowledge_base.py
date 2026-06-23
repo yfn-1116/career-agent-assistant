@@ -14,6 +14,30 @@ from career_agent.rag.schemas import DocumentChunk, ProfileDocument, RetrievedEv
 from career_agent.rag.vectorstores.memory_store import MemoryVectorStore
 
 
+def _guess_source_type(source_path: str, metadata: dict | None = None) -> str:
+    """Guess the source type from filename or metadata."""
+    if metadata:
+        item_type = str(metadata.get("item_type", "")).lower()
+        if item_type:
+            return item_type
+    path = (source_path or "").lower()
+    if "resume" in path or "简历" in path:
+        return "resume"
+    if "project" in path or "项目" in path:
+        return "project"
+    if "github" in path:
+        return "github"
+    if "skill" in path or "技能" in path:
+        return "skill"
+    if "intern" in path or "实习" in path:
+        return "internship"
+    if "cert" in path or "证书" in path or "奖" in path:
+        return "certificate"
+    if "upload" in path:
+        return "upload"
+    return "document"
+
+
 @dataclass
 class KnowledgeBaseIngestResult:
     source_name: str
@@ -170,6 +194,82 @@ class KnowledgeBaseService:
                     )
                 except Exception:
                     continue
+
+    # -- read-only query helpers -----------------------------------------------
+
+    def get_summary(self) -> dict:
+        """Return a lightweight knowledge-base summary dict.
+
+        Safe to call even when the KB is empty — all counts will be zero.
+        """
+        import os
+        chunk_count = 0
+        sources: set[str] = set()
+        for chunk in self.iter_chunks():
+            chunk_count += 1
+            if chunk.source_path:
+                sources.add(chunk.source_path)
+        repos = self.load_github_repos()
+        upload_count = sum(
+            1 for _ in self.upload_dir.iterdir()
+        ) if self.upload_dir.is_dir() else 0
+        return {
+            "chunk_count": chunk_count,
+            "source_count": len(sources),
+            "repo_count": len(repos),
+            "upload_count": upload_count,
+            "last_updated": (
+                os.path.getmtime(str(self.chunk_file))
+                if self.chunk_file.is_file()
+                else None
+            ),
+        }
+
+    def get_source_details(self) -> list[dict]:
+        """Return a list of source descriptors for the KB overview.
+
+        Each entry: source_name, source_type, chunk_count, path.
+        """
+        source_map: dict[str, dict] = {}
+        for chunk in self.iter_chunks():
+            key = chunk.source_path or chunk.document_id or "unknown"
+            if key not in source_map:
+                source_map[key] = {
+                    "source_name": chunk.source_path or chunk.document_id,
+                    "source_type": _guess_source_type(chunk.source_path, chunk.metadata),
+                    "chunk_count": 0,
+                    "path": chunk.source_path or "",
+                }
+            source_map[key]["chunk_count"] += 1
+        # Add GitHub repos as sources
+        for repo in self.load_github_repos():
+            key = f"github:{repo}"
+            if key not in source_map:
+                source_map[key] = {
+                    "source_name": repo,
+                    "source_type": "github",
+                    "chunk_count": 0,
+                    "path": f"https://github.com/{repo}",
+                }
+        return sorted(source_map.values(), key=lambda s: s["chunk_count"], reverse=True)
+
+    def get_profile_text(self) -> str:
+        """Return concatenated text of all chunks — used for profile summary.
+
+        Truncated to a reasonable length to avoid overwhelming the LLM context.
+        """
+        parts: list[str] = []
+        total = 0
+        max_chars = 8000
+        for chunk in self.iter_chunks():
+            snippet = chunk.content[:600]
+            parts.append(f"[{chunk.source_path}] {snippet}")
+            total += len(snippet)
+            if total > max_chars:
+                break
+        return "\n\n".join(parts) if parts else ""
+
+    # -- internal --------------------------------------------------------------
 
     def _append_chunks(self, chunks: list[DocumentChunk]) -> None:
         with self.chunk_file.open("a", encoding="utf-8") as handle:
