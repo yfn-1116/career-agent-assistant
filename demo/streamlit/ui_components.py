@@ -35,17 +35,20 @@ L_NO_EV = "当前知识库中缺少充分证据，不能直接写进简历。"
 # ============================================================================
 
 def render_empty_state() -> None:
+    """DeepSeek-style centered empty state."""
     st.markdown(
         '<div class="empty-state">'
+        '<div class="logo">🤖</div>'
         "<h1>实习投递智能助手</h1>"
         '<p class="subtitle">基于证据约束的实习投递 Agent</p>'
         "</div>",
         unsafe_allow_html=True,
     )
-    st.caption(
-        "粘贴岗位 JD 或输入问题，我会基于你的知识库做客观匹配分析。"
-        "支持 JD 分析、简历改写建议、HR 话术生成。"
-    )
+
+
+def render_guide_cards() -> None:
+    """No guide cards in DeepSeek style — pass."""
+    pass
 
 
 # ============================================================================

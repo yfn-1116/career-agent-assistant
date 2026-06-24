@@ -18,6 +18,7 @@ from ui_components import (
     render_candidate_profile,
     render_chat_messages,
     render_empty_state,
+    render_guide_cards,
     render_sidebar_demo_controls,
     render_sidebar_logo,
     render_sidebar_nav_section,
@@ -284,19 +285,35 @@ with st.sidebar:
 
 if not st.session_state.messages:
     render_empty_state()
+    render_guide_cards()
 
 render_chat_messages(st.session_state.messages)
 
 # ============================================================================
-# Chat Input
+# Chat Input — DeepSeek-style: large textarea + send button
 # ============================================================================
 
-user_input = st.chat_input(
-    "粘贴岗位 JD、输入 GitHub 链接，或直接问我「这个岗位适合我吗」……"
-)
+st.markdown('<div class="chat-input-wrap">', unsafe_allow_html=True)
 
-if user_input and user_input.strip():
+input_key = f"chat_input_{st.session_state.get('_input_version', 0)}"
+col_area, col_btn = st.columns([10, 1])
+with col_area:
+    user_input = st.text_area(
+        "输入",
+        placeholder="粘贴岗位 JD、输入 GitHub 链接，或直接提问……",
+        label_visibility="collapsed",
+        height=90,
+        key=input_key,
+    )
+with col_btn:
+    st.write("")  # align
+    send_clicked = st.button("↑", type="primary", use_container_width=True)
+
+st.markdown('</div>', unsafe_allow_html=True)
+
+if send_clicked and user_input.strip():
     text = user_input.strip()
+    st.session_state._input_version = st.session_state.get("_input_version", 0) + 1
     st.session_state.messages.append({"role": "user", "content": text, "type": "text"})
     intent = _route_intent(text)
 

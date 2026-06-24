@@ -82,7 +82,7 @@ class TestAppContainsRequiredContent:
 
     def test_contains_input_area(self):
         text = _read_all_demo()
-        assert "chat_input" in text or "Ask Agent" in text or "ask about" in text.lower()
+        assert any(t in text for t in ["text_input", "text_area", "chat_input", "textbox"])
 
     def test_contains_expandable_details(self):
         """Expanders live in ui_components.py after refactor."""
@@ -117,6 +117,7 @@ class TestUIModulesDontImportCore:
             "def render_sidebar_demo_controls",
             "def render_sidebar_logo",
             "def render_sidebar_nav_section",
+            "def render_guide_cards",
             "def load_sample_jd_text",
         ]
         for fn in required:

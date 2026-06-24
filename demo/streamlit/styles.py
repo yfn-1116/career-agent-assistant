@@ -1,84 +1,126 @@
-"""Minimal Chat-first CSS for Internship Copilot Streamlit UI."""
+"""DeepSeek-style minimal CSS for Internship Copilot."""
 
 from __future__ import annotations
-
 import streamlit as st
 
-ACCENT = "#4F5FD7"
+ACCENT = "#4D6BFE"
 BORDER = "#e5e7eb"
-BG = "#f9fafb"
-TEXT = "#111827"
+TEXT = "#1a1a2e"
 MUTED = "#6b7280"
 
 CSS = f"""
 <style>
-.block-container {{ padding-top: 1.5rem; max-width: 800px; }}
-section[data-testid="stSidebar"] .block-container {{ padding-top: 0.8rem; }}
-section[data-testid="stSidebar"] {{ background: #fafbfc; border-right: 1px solid {BORDER}; }}
-
-/* chat input */
-div[data-testid="stChatInput"] textarea {{
-    border: 1px solid {BORDER} !important; border-radius: 12px !important;
-    padding: 0.8rem 1rem !important; font-size: 0.92rem !important;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.04) !important; min-height: 52px !important;
+/* ===== GLOBAL ===== */
+.block-container {{
+    max-width: 720px !important;
+    padding: 7vh 1rem 1.5rem 1rem !important;
+    margin: 0 auto !important;
 }}
-div[data-testid="stChatInput"] textarea:focus {{
-    border-color: {ACCENT} !important; box-shadow: 0 0 0 3px rgba(79,95,215,0.1) !important;
+section[data-testid="stSidebar"] .block-container {{
+    padding-top: 1rem !important;
+}}
+section[data-testid="stSidebar"] {{
+    background: #fafbfc; border-right: 1px solid {BORDER};
 }}
 
-/* empty state */
-.empty-state {{ text-align: center; padding: 3rem 2rem 1rem 2rem; }}
-.empty-state h1 {{ font-size: 1.8rem; font-weight: 700; color: {TEXT}; letter-spacing: -0.02em; margin-bottom: 0.3rem; }}
-.empty-state .subtitle {{ font-size: 0.92rem; color: {MUTED}; margin-bottom: 1.5rem; }}
+/* ===== EMPTY STATE ===== */
+.empty-state {{
+    text-align: center; padding: 3rem 0 1rem 0;
+}}
+.empty-state .logo {{
+    width: 48px; height: 48px; background: {ACCENT}; border-radius: 14px;
+    margin: 0 auto 1.5rem auto; display: flex; align-items: center;
+    justify-content: center; font-size: 1.5rem; color: white;
+}}
+.empty-state h1 {{
+    font-size: 1.6rem; font-weight: 700; color: {TEXT};
+    margin-bottom: 0.3rem; letter-spacing: -0.01em;
+}}
+.empty-state .subtitle {{
+    font-size: 0.9rem; color: {MUTED}; font-weight: 400;
+    margin-bottom: 0; max-width: 400px; margin-left: auto; margin-right: auto;
+}}
 
-/* metrics */
-.inline-metrics {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.6rem; margin: 0.6rem 0; }}
-.inline-metric {{ background: white; border: 1px solid {BORDER}; border-radius: 8px; padding: 0.6rem 0.7rem; text-align: center; }}
-.inline-metric .val {{ font-size: 1.15rem; font-weight: 700; color: {TEXT}; }}
-.inline-metric .lbl {{ font-size: 0.7rem; color: {MUTED}; margin-top: 0.15rem; }}
+/* ===== CHAT INPUT AREA ===== */
+.chat-input-wrap {{
+    position: relative; width: 100%; max-width: 720px; margin: 0 auto;
+}}
+.chat-input-wrap textarea {{
+    border: 1px solid {BORDER} !important;
+    border-radius: 16px !important;
+    padding: 0.9rem 3rem 0.9rem 1.2rem !important;
+    font-size: 0.92rem !important;
+    min-height: 80px !important; max-height: 200px !important;
+    resize: none !important; width: 100% !important;
+    background: white !important; line-height: 1.55 !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05) !important;
+}}
+.chat-input-wrap textarea:focus {{
+    border-color: {ACCENT} !important;
+    box-shadow: 0 0 0 3px rgba(77,107,254,0.12) !important;
+}}
 
-/* message card */
-.msg-card {{ background: white; border: 1px solid {BORDER}; border-radius: 10px; padding: 0.9rem 1.1rem; margin: 0.5rem 0; font-size: 0.88rem; line-height: 1.6; white-space: pre-wrap; }}
-.msg-disclaimer {{ font-size: 0.75rem; color: {MUTED}; margin-top: 0.6rem; padding-top: 0.5rem; border-top: 1px solid {BORDER}; }}
+/* send button */
+div.stButton > button[kind="primary"] {{
+    background: {ACCENT} !important; border: none !important;
+    border-radius: 10px !important; font-weight: 600 !important;
+    font-size: 0.9rem !important; padding: 0.5rem 1.2rem !important;
+}}
+div.stButton > button[kind="primary"]:hover {{
+    filter: brightness(1.08);
+}}
 
-/* resume advice card */
-.advice-card {{ background: white; border: 1px solid {BORDER}; border-radius: 10px; padding: 1rem 1.2rem; margin: 0.7rem 0; }}
-.advice-card .jd-req {{ font-size: 0.82rem; color: {MUTED}; margin-bottom: 0.4rem; }}
-.advice-card .rewrite {{ font-size: 0.9rem; color: {TEXT}; line-height: 1.6; margin: 0.4rem 0; padding: 0.5rem 0.8rem; background: {BG}; border-radius: 6px; }}
-.advice-card .reason {{ font-size: 0.8rem; color: {MUTED}; margin: 0.3rem 0; }}
-.advice-card .source {{ font-size: 0.75rem; color: {MUTED}; }}
-.advice-card .status-tag {{ display: inline-block; font-size: 0.7rem; padding: 0.15rem 0.5rem; border-radius: 10px; margin-top: 0.3rem; }}
+/* ===== CHAT MESSAGES ===== */
+.inline-metrics {{
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; margin: 0.5rem 0;
+}}
+.inline-metric {{
+    background: white; border: 1px solid {BORDER}; border-radius: 8px;
+    padding: 0.5rem 0.6rem; text-align: center;
+}}
+.inline-metric .val {{ font-size: 1.1rem; font-weight: 700; color: {TEXT}; }}
+.inline-metric .lbl {{ font-size: 0.68rem; color: {MUTED}; margin-top: 0.1rem; }}
+
+.msg-card {{
+    background: #f9fafb; border: 1px solid {BORDER}; border-radius: 10px;
+    padding: 0.9rem 1.1rem; margin: 0.5rem 0; font-size: 0.88rem;
+    line-height: 1.6; white-space: pre-wrap;
+}}
+.msg-disclaimer {{ font-size: 0.75rem; color: {MUTED}; margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid {BORDER}; }}
+
+.advice-card {{
+    background: white; border: 1px solid {BORDER}; border-radius: 10px;
+    padding: 0.9rem 1rem; margin: 0.5rem 0;
+}}
+.advice-card .jd-req {{ font-size: 0.8rem; color: {MUTED}; margin-bottom: 0.3rem; }}
+.advice-card .rewrite {{ font-size: 0.88rem; color: {TEXT}; line-height: 1.55; margin: 0.3rem 0; padding: 0.4rem 0.7rem; background: #f9fafb; border-radius: 6px; }}
+.advice-card .reason {{ font-size: 0.78rem; color: {MUTED}; margin: 0.3rem 0; }}
+.advice-card .source {{ font-size: 0.73rem; color: {MUTED}; }}
+.advice-card .status-tag {{ display: inline-block; font-size: 0.68rem; padding: 0.12rem 0.45rem; border-radius: 10px; margin-top: 0.3rem; }}
 .advice-card .status-tag.can-write {{ background: #ecfdf3; color: #15803d; }}
 .advice-card .status-tag.needs-confirm {{ background: #fff7ed; color: #c2410c; }}
 .advice-card .status-tag.learn-only {{ background: #f3f4f6; color: #6b7280; }}
 
-/* risk box */
-.risk-box {{ background: #fef9f0; border: 1px solid #f0d89c; border-radius: 8px; padding: 0.7rem 1rem; margin: 0.6rem 0; font-size: 0.85rem; color: #8a6d3b; }}
+.risk-box {{
+    background: #fef9f0; border: 1px solid #f0d89c; border-radius: 8px;
+    padding: 0.6rem 0.9rem; margin: 0.5rem 0; font-size: 0.83rem; color: #8a6d3b;
+}}
 
-/* evidence */
-.ev-item {{ font-size: 0.82rem; padding: 0.35rem 0; border-bottom: 1px solid {BORDER}; line-height: 1.45; }}
+.ev-item {{ font-size: 0.8rem; padding: 0.3rem 0; border-bottom: 1px solid {BORDER}; line-height: 1.4; }}
 .ev-item:last-child {{ border-bottom: none; }}
-.ev-meta {{ font-size: 0.7rem; color: {MUTED}; margin-top: 0.1rem; }}
-.ev-meta code {{ font-size: 0.68rem; background: {BG}; padding: 0.03rem 0.3rem; border-radius: 3px; }}
+.ev-meta {{ font-size: 0.68rem; color: {MUTED}; margin-top: 0.08rem; }}
+.ev-meta code {{ font-size: 0.66rem; background: #f9fafb; padding: 0.03rem 0.3rem; border-radius: 3px; }}
 
-/* sidebar profile */
-.sidebar-profile {{ font-size: 0.8rem; color: {TEXT}; line-height: 1.5; padding: 0.3rem 0.2rem; }}
-.sidebar-profile .label {{ font-size: 0.65rem; color: {MUTED}; text-transform: uppercase; letter-spacing: 0.04em; }}
+/* ===== SIDEBAR ===== */
+.sidebar-profile {{ font-size: 0.78rem; color: {TEXT}; line-height: 1.5; padding: 0.2rem 0.2rem; }}
+.sidebar-profile .label {{ font-size: 0.63rem; color: {MUTED}; text-transform: uppercase; letter-spacing: 0.04em; }}
 .sidebar-profile .val {{ font-weight: 500; }}
-
-/* sidebar kb */
-.sidebar-kb-stat {{ font-size: 0.8rem; color: {TEXT}; padding: 0.1rem 0.2rem; }}
+.sidebar-kb-stat {{ font-size: 0.78rem; color: {TEXT}; padding: 0.08rem 0.2rem; }}
 .sidebar-kb-stat .num {{ font-weight: 700; color: {ACCENT}; }}
-.sidebar-nav-section {{ font-size: 0.7rem; font-weight: 600; color: {MUTED}; padding: 0.5rem 0.2rem 0.15rem 0.2rem; }}
-
-/* buttons */
-div.stButton > button[kind="primary"] {{ background: {ACCENT} !important; border: none !important; border-radius: 8px !important; font-weight: 500 !important; }}
-div.stButton > button[kind="primary"]:disabled {{ background: #d1d5db !important; color: #9ca3af !important; }}
-section[data-testid="stSidebar"] .stButton > button {{ border-radius: 8px; border: 1px solid {BORDER}; background: white; font-size: 0.82rem; }}
-
-/* skeleton */
-.skeleton-block {{ background: linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 8px; height: 40px; margin: 0.4rem 0; }}
-@keyframes shimmer {{ 0% {{ background-position: 200% 0; }} 100% {{ background-position: -200% 0; }} }}
+.sidebar-nav-section {{ font-size: 0.68rem; font-weight: 600; color: {MUTED}; padding: 0.4rem 0.2rem 0.12rem 0.2rem; }}
+section[data-testid="stSidebar"] .stButton > button {{
+    border-radius: 8px; border: 1px solid {BORDER}; background: white; font-size: 0.8rem;
+}}
 </style>
 """
 
