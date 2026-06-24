@@ -290,30 +290,15 @@ if not st.session_state.messages:
 render_chat_messages(st.session_state.messages)
 
 # ============================================================================
-# Chat Input — DeepSeek-style: large textarea + send button
+# Chat Input — native st.chat_input (best IME + Enter support)
 # ============================================================================
 
-st.markdown('<div class="chat-input-wrap">', unsafe_allow_html=True)
+user_input = st.chat_input(
+    "粘贴岗位 JD、输入 GitHub 链接，或直接提问……"
+)
 
-input_key = f"chat_input_{st.session_state.get('_input_version', 0)}"
-col_area, col_btn = st.columns([10, 1])
-with col_area:
-    user_input = st.text_area(
-        "输入",
-        placeholder="粘贴岗位 JD、输入 GitHub 链接，或直接提问……",
-        label_visibility="collapsed",
-        height=90,
-        key=input_key,
-    )
-with col_btn:
-    st.write("")  # align
-    send_clicked = st.button("↑", type="primary", use_container_width=True)
-
-st.markdown('</div>', unsafe_allow_html=True)
-
-if send_clicked and user_input.strip():
+if user_input and user_input.strip():
     text = user_input.strip()
-    st.session_state._input_version = st.session_state.get("_input_version", 0) + 1
     st.session_state.messages.append({"role": "user", "content": text, "type": "text"})
     intent = _route_intent(text)
 

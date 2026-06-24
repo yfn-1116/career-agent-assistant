@@ -41,21 +41,17 @@ section[data-testid="stSidebar"] {{
     margin-bottom: 0; max-width: 400px; margin-left: auto; margin-right: auto;
 }}
 
-/* ===== CHAT INPUT AREA ===== */
-.chat-input-wrap {{
-    position: relative; width: 100%; max-width: 720px; margin: 0 auto;
-}}
-.chat-input-wrap textarea {{
+/* ===== CHAT INPUT (st.chat_input) ===== */
+div[data-testid="stChatInput"] textarea {{
     border: 1px solid {BORDER} !important;
     border-radius: 16px !important;
-    padding: 0.9rem 3rem 0.9rem 1.2rem !important;
-    font-size: 0.92rem !important;
-    min-height: 80px !important; max-height: 200px !important;
-    resize: none !important; width: 100% !important;
-    background: white !important; line-height: 1.55 !important;
+    padding: 1rem 1.2rem !important;
+    font-size: 0.95rem !important;
+    min-height: 72px !important;
+    background: white !important;
     box-shadow: 0 2px 8px rgba(0,0,0,0.05) !important;
 }}
-.chat-input-wrap textarea:focus {{
+div[data-testid="stChatInput"] textarea:focus {{
     border-color: {ACCENT} !important;
     box-shadow: 0 0 0 3px rgba(77,107,254,0.12) !important;
 }}
