@@ -113,11 +113,8 @@ class TestUIModulesDontImportCore:
         required = [
             "def render_empty_state",
             "def render_chat_messages",
-            "def render_evidence_gate",
-            "def render_application_records",
-            "def render_sidebar_pipeline",
+            "def render_candidate_profile",
             "def render_sidebar_demo_controls",
-            "def render_sidebar_kb_stats",
             "def render_sidebar_logo",
             "def render_sidebar_nav_section",
             "def load_sample_jd_text",
