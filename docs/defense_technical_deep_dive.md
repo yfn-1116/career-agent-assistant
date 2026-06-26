@@ -230,7 +230,52 @@ Perception ──→ Memory ──→ Action
 
 ---
 
-## 十、对比 OpenCode（1 页）
+## 十、多 Agent 协作：树状递归（2 页）
+
+**核心机制：Agent 本身是一个 Tool（task_agent），所以 Agent 能 spawn Agent——形成递归树。**
+
+```
+用户: "帮我分析两个 JD + 拉 GitHub"
+    │
+    ▼
+┌─────────────────────────────────────────┐
+│ 主 Agent (全部 16 个 Tool)               │
+│ LLM 推理: "三个独立任务 → 并行 spawn"      │
+└──┬──────────────┬──────────────┬────────┘
+   │              │              │
+   ▼              ▼              ▼
+子Agent A      子Agent B      子Agent C
+Role:"搜索"    Role:"分析"     Role:"分析"
+Tools:github,  Tools:parse_jd, Tools:parse_jd,
+      web      retrieve,      retrieve,
+               analyze        task_agent
+                   │              │
+                   │    ┌─────────┘
+                   │    ▼
+                   │  子子Agent (第3层!)
+                   │  Role:"验证"
+                   │  Tools:check_faithfulness
+                   │    │
+                   ▼    ▼
+                各自返回一条结果给主 Agent
+                       │
+                       ▼
+              主 Agent 整合 → 最终答案
+```
+
+**三个设计要素：**
+
+| 要素 | 实现 | 代码 |
+|---|---|---|
+| **角色** | 不同的 System Prompt | `sub_agent.py:79-97` |
+| **权限** | `allowed_tools` 白名单 | `sub_agent.py:53-57` |
+| **通信** | 父传 `task` 字符串给子，子返回 `SubAgentResult` | `TaskAgentTool` → `SubAgent.execute()` |
+
+**递归本质：每个 Agent 都有 `task_agent` 这个 Tool → 每层都能 spawn 下一层。执行栈 = 函数调用栈：main → sub → sub_sub → 层层返回。**
+
+---
+
+## 十一、对比 OpenCode（1 页）
 
 | | OpenCode（通用） | 本系统（垂直） |
 |---|---|---|

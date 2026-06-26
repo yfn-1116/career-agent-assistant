@@ -367,7 +367,89 @@ tools/registry.py:488  TaskAgentTool
 
 ---
 
-## ⑦ 对比 OpenCode（PPT 第11页）
+## ⑩ 多 Agent 递归树（PPT 第10-11页）
+
+**PPT 展示：** 树状递归图
+
+**怎么讲：**
+
+> "多 Agent 协作是一个树状递归结构。Agent 本身被注册为 task_agent 这个 Tool，所以父 Agent 能 spawn 子 Agent。子 Agent 也有独立的 System Prompt（角色不同）、受限的 Tool 白名单（权限不同）、通过 task 字符串传递任务。关键是子 Agent 也能调 task_agent——这就形成了递归。执行栈和函数调用栈一模一样：主 Agent 调子 Agent，子 Agent 调孙子 Agent，结果一层层传回来。"
+
+**代码路径：**
+
+```
+主 Agent:
+  agents/orchestrator.py:70 → _handle_autonomous()
+    → agents/autonomous_agent.py:67 → AutonomousAgent.run()
+        │
+        │ LLM 看到 task_agent 这个 Tool:
+        │   tools/registry.py:488  TaskAgentTool
+        │   description: "启动子 Agent 执行独立任务..."
+        │
+        │ LLM 决定 spawn → 输出:
+        │   {"tool_call": {"name": "task_agent", "input": {
+        │     "task": "分析 JD_1",
+        │     "allowed_tools": ["parse_jd", "retrieve_profile", "analyze_match"]
+        │   }}}
+        │
+        ▼
+子 Agent:
+  tools/registry.py:488 → TaskAgentTool.run(task="分析 JD_1", allowed_tools=[...])
+    → agents/sub_agent.py:39 → SubAgent.execute(task, allowed_tools)
+        │
+        │ 创建独立 System Prompt (sub_agent.py:79):
+        │   "你是子任务执行 Agent。只做任务描述里要求的事情..."
+        │
+        │ 独立 session, 独立 LLM 循环 (max_steps=8)
+        │
+        │ 子 Agent 自己也能看到 task_agent → 能 spawn 孙子 Agent
+        │
+        └── 返回 SubAgentResult {answer: "匹配度 74%", tools_called: [...]}
+
+结果回传主 Agent → 主 Agent 继续决策 → 最终整合输出
+```
+
+**递归本质：**
+
+```
+执行栈：
+  main_agent(深度1)
+    ├── sub_agent_B(深度2)
+    │     ├── parse_jd
+    │     ├── retrieve
+    │     └── 返回结果
+    │
+    ├── sub_agent_C(深度2)
+    │     ├── sub_sub_agent(深度3)  ← 子 Agent 也能 spawn!
+    │     │     ├── web_search
+    │     │     └── 返回结果
+    │     └── 返回结果
+    │
+    └── 整合 → 返回用户
+
+每个 Agent 都有 task_agent → 每层都能递归
+和函数调用完全一样：父调子、子调孙、层层返回
+```
+
+**三个要素的代码：**
+
+```
+① 角色 = 不同的 System Prompt
+   sub_agent.py:79-97
+   "你是子任务执行 Agent。你的主 Agent 分配了一个任务给你。"
+
+② 权限 = allowed_tools 白名单
+   sub_agent.py:53-57
+   default_tools = ["parse_jd","retrieve_profile","web_search","github_repo"]
+
+③ 通信 = task 字符串 + SubAgentResult
+   父 → 子：task="详细任务描述"
+   子 → 父：SubAgentResult {answer, tools_called, success}
+```
+
+---
+
+## ⑪ 对比 OpenCode（PPT 第12页）
 
 **PPT 展示：** 对比表格
 
