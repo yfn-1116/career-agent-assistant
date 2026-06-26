@@ -17,7 +17,7 @@
 
 ## 二、系统架构：PPAM 认知 Agent
 
-本系统按认知 Agent 四组件（PPAM）设计：
+本系统按认知 Agent 四组件（PPAM）设计，代码按层组织：
 
 ```
 用户输入 → Perception → Planning → Action → 输出
@@ -27,12 +27,12 @@
                      Memory
 ```
 
-| 组件 | 一句话 | 核心模块 | 代码 |
+| 组件 | 一句话 | 包路径 | 核心模块 |
 |---|---|---|---|
-| **Perception** | 看懂用户说什么 | 意图路由 + FileLoader + JDParser | `agents/orchestrator.py` |
-| **Planning** | 决定走哪条路 | LangGraph DAG + ControlledPlanner | `workflows/langgraph_workflow.py` |
-| **Action** | 干活 | 15 Tool + RAG Pipeline + Evidence Gate | `tools/registry.py` + `rag/` |
-| **Memory** | 记住上下文 | ConversationMemory + KnowledgeBase | `agents/memory.py` |
+| **Perception** | 看懂用户说什么 | `perception/` | FileLoader + JDParser + GitHubReader + 意图路由 |
+| **Planning** | 决定走哪条路 | `planning/` | Orchestrator + LangGraph DAG + ControlledPlanner |
+| **Action** | 干活 | `action/` | ToolRegistry (15 tools) + RAG Pipeline + Evidence Gate |
+| **Memory** | 记住上下文 | `memory/` | ConversationMemory + KnowledgeBaseService |
 
 ---
 
