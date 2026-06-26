@@ -99,6 +99,7 @@ class _WorkflowContext:
         self,
         jd_parser=None, rag_pipeline=None, match_agent=None, build_agent=None,
         hybrid_retriever=None, reranker=None, faithfulness_checker=None,
+        cross_encoder_reranker=None,
     ):
         self.jd_parser = jd_parser or JDParserAgent()
         self.rag_pipeline = rag_pipeline or RAGPipeline()
@@ -107,6 +108,7 @@ class _WorkflowContext:
         self.build_agent = build_agent or BuildAgent()
         self.hybrid_retriever = hybrid_retriever
         self.reranker = reranker or LightweightReranker(top_k=5)
+        self.cross_encoder_reranker = cross_encoder_reranker
         self.faithfulness_checker = faithfulness_checker or FaithfulnessChecker()
 
 
@@ -199,7 +201,33 @@ def rerank_node(state, *, ctx):
     if not chunks:
         return {"reranked_chunks": [], "next_action": "grade_retrieval"}
 
-    # Convert to domain RetrievedChunk for reranker
+    query = state.get("queries", [""])[-1] if state.get("queries") else ""
+
+    # --- try Cross-Encoder Reranker first ---
+    ce = ctx.cross_encoder_reranker
+    if ce is not None:
+        try:
+            ce_results = ce.rerank(query, chunks, top_n=10)
+            result = []
+            for ev, ce_score in ce_results:
+                base_meta = dict(ev.metadata) if isinstance(ev.metadata, dict) else {}
+                base_meta.update({"rerank_score": round(ce_score, 4), "reranker": "cross_encoder"})
+                result.append(RetrievedEvidence(
+                    evidence_id=ev.evidence_id, chunk_id=ev.chunk_id,
+                    title=getattr(ev, "title", ""), content=ev.content,
+                    score=ce_score, source_path=ev.source_path,
+                    matched_keywords=list(getattr(ev, "matched_keywords", [])),
+                    metadata=base_meta,
+                ))
+            state["logs"].append(f"rerank (cross-encoder): {len(result)} chunks (from {len(chunks)})")
+            tr = _record_tool_call(state, "rerank_chunks", input_summary=f"{len(chunks)} chunks",
+                                   output_summary=f"{len(result)} reranked (cross-encoder)")
+            return {"reranked_chunks": result, "retrieved_chunks": result,
+                    "next_action": "grade_retrieval", "tool_trace": tr["tool_trace"]}
+        except Exception:
+            pass  # fall through to lightweight reranker
+
+    # --- fallback to rule-based LightweightReranker ---
     from career_agent.domain.schemas import RetrievedChunk as DomainChunk
     domain_chunks = []
     for ev in chunks:
@@ -221,7 +249,6 @@ def rerank_node(state, *, ctx):
 
     reranked = ctx.reranker.rerank(domain_chunks, jd_skills=jd_skills if jd_skills else None)
 
-    # Convert back to RetrievedEvidence — merge (not replace) metadata
     result = []
     for dc, orig_ev in zip(reranked, chunks):
         base_meta = dict(orig_ev.metadata) if isinstance(orig_ev.metadata, dict) else {}
@@ -231,6 +258,7 @@ def rerank_node(state, *, ctx):
             "final_hybrid_score": dc.final_hybrid_score,
             "keyword_score": dc.keyword_score,
             "vector_score": dc.vector_score,
+            "reranker": "lightweight",
         })
         result.append(RetrievedEvidence(
             evidence_id=f"rerank-{dc.chunk_id}", chunk_id=dc.chunk_id,
@@ -241,9 +269,11 @@ def rerank_node(state, *, ctx):
             metadata=base_meta,
         ))
 
-    state["logs"].append(f"rerank: {len(result)} chunks (from {len(chunks)})")
-    tr = _record_tool_call(state, "rerank_chunks", input_summary=f"{len(chunks)} chunks", output_summary=f"{len(result)} reranked")
-    return {"reranked_chunks": result, "retrieved_chunks": result, "next_action": "grade_retrieval", "tool_trace": tr["tool_trace"]}
+    state["logs"].append(f"rerank (lightweight): {len(result)} chunks (from {len(chunks)})")
+    tr = _record_tool_call(state, "rerank_chunks", input_summary=f"{len(chunks)} chunks",
+                           output_summary=f"{len(result)} reranked (lightweight)")
+    return {"reranked_chunks": result, "retrieved_chunks": result,
+            "next_action": "grade_retrieval", "tool_trace": tr["tool_trace"]}
 
 
 def grade_retrieval_node(state, *, ctx):  # noqa: ARG001
@@ -545,12 +575,14 @@ def _render_langgraph_report(state):
 def create_langgraph_workflow(
     jd_parser=None, rag_pipeline=None, match_agent=None, build_agent=None,
     profile_dir="", hybrid_retriever=None, reranker=None, faithfulness_checker=None,
+    cross_encoder_reranker=None,
 ):
     ctx = _WorkflowContext(
         jd_parser=jd_parser, rag_pipeline=rag_pipeline,
         match_agent=match_agent, build_agent=build_agent,
         hybrid_retriever=hybrid_retriever, reranker=reranker,
         faithfulness_checker=faithfulness_checker,
+        cross_encoder_reranker=cross_encoder_reranker,
     )
     if profile_dir:
         ctx.rag_pipeline.build_index(profile_dir)
@@ -618,10 +650,22 @@ def run_langgraph_workflow(
         except Exception:
             hr = None
 
+    # CrossEncoderReranker for ML-enhanced reranking (loaded by default).
+    # Set DISABLE_ML_RERANKER=1 to skip (lightweight mode / testing).
+    import os as _os
+    ce_reranker = None
+    if not _os.environ.get("DISABLE_ML_RERANKER"):
+        try:
+            from career_agent.rag.reranker import CrossEncoderReranker
+            ce_reranker = CrossEncoderReranker(device="cpu")
+        except Exception:
+            pass
+
     app = create_langgraph_workflow(
         jd_parser=jd_parser, rag_pipeline=rag_pipeline,
         match_agent=match_agent, build_agent=build_agent,
         profile_dir=profile_dir, hybrid_retriever=hr,
+        cross_encoder_reranker=ce_reranker,
     )
     initial = _initial_state(raw_jd=raw_jd, top_k=top_k,
                              profile_dir=str(profile_dir), output_dir=str(output_dir))

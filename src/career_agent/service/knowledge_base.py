@@ -6,7 +6,7 @@ import hashlib
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
+from typing import Any, Iterable
 
 from career_agent.rag.chunking.text_chunker import TextChunker
 from career_agent.rag.loaders.file_loader import FileLoader
@@ -46,7 +46,11 @@ class KnowledgeBaseIngestResult:
 
 
 class KnowledgeBaseService:
-    """Manage local runtime uploads and persisted demo knowledge-base chunks."""
+    """Manage local runtime uploads and persisted demo knowledge-base chunks.
+
+    Uses BM25 keyword retrieval (with jieba) when available;
+    falls back to MemoryVectorStore token matching otherwise.
+    """
 
     def __init__(self, runtime_dir: str | Path = "runtime") -> None:
         self.runtime_dir = Path(runtime_dir)
@@ -56,6 +60,8 @@ class KnowledgeBaseService:
         self.repo_file = self.knowledge_base_dir / "chunks.repos.txt"
         self.chunker = TextChunker()
         self.file_loader = FileLoader()
+        self._bm25: Any = None
+        self._bm25_dirty: bool = True
 
     def ensure_dirs(self) -> None:
         self.knowledge_base_dir.mkdir(parents=True, exist_ok=True)
@@ -88,7 +94,7 @@ class KnowledgeBaseService:
         return result
 
     def load_store(self) -> tuple[MemoryVectorStore, int]:
-        """Load persisted chunks into an in-memory vector store."""
+        """Load persisted chunks into an in-memory vector store (legacy)."""
         store = MemoryVectorStore()
         count = 0
         for chunk in self.iter_chunks():
@@ -96,7 +102,38 @@ class KnowledgeBaseService:
             count += 1
         return store, count
 
+    # -- BM25-enhanced search -------------------------------------------------
+
+    def _ensure_bm25_index(self) -> None:
+        """Build BM25 index from JSONL if dirty or not yet built."""
+        if not self._bm25_dirty and self._bm25 is not None:
+            return
+
+        try:
+            from career_agent.rag.retrievers.bm25_retriever import BM25Retriever
+        except ImportError:
+            self._bm25 = None
+            self._bm25_dirty = False
+            return
+
+        retriever = BM25Retriever()
+        chunks = list(self.iter_chunks())
+        if chunks:
+            retriever.add_chunks(chunks)
+        self._bm25 = retriever
+        self._bm25_dirty = False
+
     def search(self, query: str, top_k: int = 5) -> list[RetrievedEvidence]:
+        """Keyword search with BM25 when available; falls back to MemoryVectorStore.
+
+        The BM25 index is rebuilt lazily on first call after chunks change.
+        """
+        self._ensure_bm25_index()
+        if self._bm25 is not None:
+            results = self._bm25.search(query, top_k=top_k)
+            if results:
+                return results
+        # Fallback to legacy MemoryVectorStore
         store, _ = self.load_store()
         return store.search(query=query, top_k=top_k)
 
@@ -272,6 +309,7 @@ class KnowledgeBaseService:
     # -- internal --------------------------------------------------------------
 
     def _append_chunks(self, chunks: list[DocumentChunk]) -> None:
+        self._bm25_dirty = True  # mark for rebuild
         with self.chunk_file.open("a", encoding="utf-8") as handle:
             for chunk in chunks:
                 handle.write(json.dumps({

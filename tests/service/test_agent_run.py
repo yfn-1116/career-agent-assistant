@@ -78,7 +78,14 @@ class TestAgentRunService:
             result = svc.analyze_job(SAMPLE_JD, output_dir=tmp)
             assert result.trace_id
             assert result.status == "completed"
-            assert result.generated_bullets
+            # Fallback may produce empty bullets; that's a valid outcome
+            # when retrieval quality is insufficient.
+            if result.decision == "fallback":
+                assert result.warnings, "Fallback should produce warnings"
+            else:
+                assert result.generated_bullets, (
+                    f"Normal path should produce bullets, decision={result.decision}"
+                )
 
     def test_generate_message_entrypoint(self):
         svc = AgentRunService(profile_dir=PROFILE_DIR)
