@@ -8,6 +8,8 @@ sys.path.insert(0, str(_REPO_ROOT / "src"))
 
 import streamlit as st
 
+from career_agent.agents.memory import ConversationMemory
+from career_agent.agents.orchestrator import OrchestratorAgent
 from career_agent.service.agent_run import AgentRunRequest, AgentRunService
 from career_agent.service.application_service import ApplicationService
 from career_agent.service.knowledge_base import KnowledgeBaseService
@@ -47,12 +49,13 @@ _GITHUB_URL = "github.com"
 
 
 @st.cache_resource
-def _services() -> tuple[KnowledgeBaseService, ApplicationService, AgentRunService]:
-    return (
-        KnowledgeBaseService(),
-        ApplicationService(),
-        AgentRunService(profile_dir=PROFILE_DIR),
-    )
+def _services() -> tuple[KnowledgeBaseService, ApplicationService, AgentRunService, OrchestratorAgent]:
+    kb = KnowledgeBaseService()
+    app = ApplicationService()
+    agent = AgentRunService(profile_dir=PROFILE_DIR)
+    memory = ConversationMemory()
+    orch = OrchestratorAgent(memory=memory, kb_service=kb, agent_service=agent)
+    return kb, app, agent, orch
 
 
 def _llm(prompt: str, system: str = "你是专业的求职顾问助手") -> str | None:
@@ -183,7 +186,7 @@ GitHub: {', '.join(repos) if repos else '暂无'}
 
 st.set_page_config(page_title="实习投递智能助手", page_icon="🤖", layout="wide")
 inject_custom_css()
-kb_service, app_service, agent_service = _services()
+kb_service, app_service, agent_service, orchestrator = _services()
 
 _defaults = {
     "messages": [], "profile_summary": "", "applications": [],
@@ -210,6 +213,7 @@ with st.sidebar:
     # -- New chat --
     if st.button("＋ 新建对话", use_container_width=True):
         st.session_state.messages = []
+        orchestrator.memory.clear_short_term()
         st.rerun()
 
     st.divider()
@@ -263,7 +267,14 @@ with st.sidebar:
         if text:
             st.session_state.messages.append({"role": "user", "content": text, "type": "text"})
             with st.spinner("分析中…"):
-                msg = _run_analysis(text, agent_service)
+                resp = orchestrator.handle(text)
+                msg = {"role": "assistant", "content": resp.message, "type": "analysis",
+                       "data": {"result": resp.data.get("result"), "ppam": {
+                           "intent": resp.intent,
+                           "perception": resp.perception_summary,
+                           "plan": resp.plan_summary,
+                           "action": resp.action_summary,
+                       }}}
                 st.session_state.messages.append(msg)
                 try:
                     app_service.save_from_agent_result(
@@ -277,7 +288,22 @@ with st.sidebar:
 
     if clear_chat:
         st.session_state.messages = []
+        orchestrator.memory.clear_short_term()
         st.rerun()
+
+    # -- PPAM Trace --
+    st.divider()
+    with st.expander("🔍 PPAM 认知追踪"):
+        mem_summary = orchestrator.memory.summary()
+        st.caption(f"Memory: {mem_summary}")
+        last_ppam = st.session_state.get("last_ppam", {})
+        if last_ppam:
+            st.caption(f"**意图**: {last_ppam.get('intent', '?')}")
+            st.caption(f"**感知**: {last_ppam.get('perception', '?')}")
+            st.caption(f"**规划**: {last_ppam.get('plan', '?')}")
+            st.caption(f"**行动**: {last_ppam.get('action', '?')}")
+        else:
+            st.caption("尚未执行 PPAM 流程")
 
 # ============================================================================
 # Main Area — chat
@@ -300,25 +326,37 @@ user_input = st.chat_input(
 if user_input and user_input.strip():
     text = user_input.strip()
     st.session_state.messages.append({"role": "user", "content": text, "type": "text"})
-    intent = _route_intent(text)
 
     with st.spinner("分析中…"):
-        if intent in ("analyze_job", "tailor_resume"):
-            msg = _run_analysis(text, agent_service)
+        # Use OrchestratorAgent for full PPAM pipeline
+        resp = orchestrator.handle(text)
+
+        ppam_trace = {
+            "intent": resp.intent,
+            "perception": resp.perception_summary,
+            "plan": resp.plan_summary,
+            "action": resp.action_summary,
+        }
+        st.session_state["last_ppam"] = ppam_trace
+
+        msg = {
+            "role": "assistant",
+            "content": resp.message,
+            "type": "analysis" if resp.intent == "analyze_job" else "text",
+            "data": {"result": resp.data.get("result"), "ppam": ppam_trace},
+        }
+
+        # Save application record if analysis was run
+        if resp.intent == "analyze_job" and resp.data.get("result"):
             try:
                 app_service.save_from_agent_result(
-                    msg["data"]["result"], job_title=text.split("\n")[0][:50], company="", jd_text=text,
+                    resp.data["result"],
+                    job_title=text.split("\n")[0][:50],
+                    company="",
+                    jd_text=text,
                 )
             except Exception:
                 pass
-        elif intent == "generate_message":
-            msg = _run_message(text, agent_service)
-        elif intent == "show_profile":
-            msg = _run_profile(kb_service)
-        elif intent == "github_ingest":
-            msg = _run_github_ingest(text, kb_service)
-        else:
-            msg = _run_chat(text, kb_service)
 
         st.session_state.messages.append(msg)
         st.rerun()

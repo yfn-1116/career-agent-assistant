@@ -60,6 +60,35 @@
 
 ## 第三章：系统架构
 
+### PPT 展示：认知 Agent 四组件（PPAM）
+
+**你需要知道的补充：**
+
+本系统的架构设计遵循认知 Agent 的 Perception-Planning-Action-Memory (PPAM) 框架：
+
+```
+Perception（感知）→ Planning（规划）→ Action（行动）→ Memory（记忆）
+```
+
+**四组件的代码对应：**
+
+| 组件 | 入口模块 | 关键文件 |
+|---|---|---|
+| Perception | `OrchestratorAgent._perceive()` | `agents/orchestrator.py:57` — 6 种意图分类 |
+| Planning | `OrchestratorAgent._plan()` + LangGraph | `agents/orchestrator.py:101` — 意图→执行路径映射 |
+| Action | `ToolRegistry.invoke()` + RAG Pipeline | `tools/registry.py:50` — 15 个工具统一调用 |
+| Memory | `ConversationMemory.remember()/recall()` | `agents/memory.py:45,92` — 短时+长时双重记忆 |
+
+**为什么用 PPAM 框架而不是直接介绍技术栈：**
+- 认知 Agent 是 AI 领域的经典理论框架
+- 每一层都有对应的代码实现，不是空洞的概念
+- 答辩时可以用这个框架串起所有技术点
+
+**新增模块（本次实现）：**
+- `agents/orchestrator.py` — 总控 Agent（~220 行）
+- `agents/memory.py` — 对话记忆管理器（~140 行）
+- 测试：`tests/agents/test_orchestrator.py` (10 tests) + `tests/agents/test_memory.py` (8 tests)
+
 ### PPT 展示：六层架构图
 
 **每层的实际目录和关键文件：**
@@ -253,6 +282,57 @@ TextChunker.chunk_document(doc)
 ---
 
 ## 第六章：关键模块实现
+
+### 6.0 OrchestratorAgent（总控 Agent）— 新增
+
+**文件：** `agents/orchestrator.py`
+
+核心是 `handle()` 方法，一次调用走完整 PPAM 循环：
+
+```python
+def handle(self, user_message):
+    # Perception: 分类意图 + 提取关键词
+    intent, keywords = self._perceive(user_message)
+    
+    # Memory: 记录用户输入 + 从长时记忆召回相关上下文
+    self.memory.user_says(user_message)
+    recalled = self._recall_context(user_message, intent)
+    
+    # Planning: 意图 → 执行路径
+    plan = self._plan(intent, user_message)
+    # analyze_job → "langgraph_job_match"
+    # chat → "rag_chat"
+    # show_profile → "kb_lookup"
+    
+    # Action: 执行具体路径
+    result = self._act(plan, user_message, intent, keywords)
+    
+    # Memory: 存储结果
+    self.memory.assistant_says(result.message)
+    
+    return AgentResponse(message=..., intent=..., 
+                         perception_summary=..., plan_summary=..., action_summary=...)
+```
+
+**设计思路：** 参考了 OpenCode 的 Agent 调度模式（`agent.processGeneration()`），但做了简化——我们不需要 LLM 自主决策下一步（场景固定），用意图路由 + LangGraph DAG 更可控。
+
+### 6.0b ConversationMemory（对话记忆）— 新增
+
+**文件：** `agents/memory.py`
+
+两层记忆：
+- **短时记忆：** 内存列表，保留最近 20 条消息，`context_text()` 格式化为 LLM context
+- **长时记忆：** JSONL 文件持久化，`recall()` 用 BM25 检索历史相关对话
+
+```python
+mem = ConversationMemory()
+mem.user_says("我想找 Python 后端的实习")      # → 写入短时 + JSONL
+mem.assistant_says("匹配度 74%", intent="analyze_job")
+
+# 下次对话时
+recalled = mem.recall("Python 后端", top_k=3)  # → BM25 检索历史
+ctx = mem.context_text(n=10)                   # → 格式化上下文给 LLM
+```
 
 ### 6.1 PDF 数据摄入
 

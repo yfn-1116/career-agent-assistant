@@ -98,6 +98,59 @@ interface → service → workflow → agent/rag → domain
 
 ---
 
+### 3.3 认知架构：Perception → Planning → Action → Memory
+
+本系统采用认知 Agent 四组件架构（PPAM），将求职匹配任务映射到标准的智能体认知循环：
+
+```
+┌──────────────┐    ┌──────────────┐    ┌──────────────┐
+│  Perception  │───→│   Planning   │───→│    Action    │
+│   感知层      │    │   规划层      │    │   执行层      │
+├──────────────┤    ├──────────────┤    ├──────────────┤
+│• FileLoader  │    │• Orchestrator│    │• ToolRegistry│
+│• JDParser    │    │• LangGraph   │    │  15 个 Tool  │
+│• IntentRouter│    │  StateGraph  │    │• BM25+Emb    │
+│• GitHubReader│    │• Controlled  │    │• CrossEnc    │
+│• jieba 分词   │    │  Planner     │    │• BuildAgent  │
+└──────┬───────┘    └──────────────┘    └──────┬───────┘
+       │                                       │
+       │         ┌──────────────┐              │
+       └────────→│    Memory    │←─────────────┘
+                 │   记忆层      │
+                 ├──────────────┤
+                 │• 短时记忆     │
+                 │  (会话上下文) │
+                 │• 长时记忆     │
+                 │  (JSONL 知识库)│
+                 │• BM25 回忆    │
+                 └──────────────┘
+```
+
+**四组件与代码模块的对应：**
+
+| 认知组件 | 实现模块 | 关键技术 |
+|---|---|---|
+| **Perception** | `agents/orchestrator.py:_perceive()` | 意图分类（6 种）、关键词提取、文件解析（PDF/DOCX/MD） |
+| **Planning** | `agents/orchestrator.py:_plan()` + `workflows/langgraph_workflow.py` | LangGraph StateGraph 确定性 DAG、ControlledPlanner 规则决策 |
+| **Action** | `tools/registry.py` (15 Tool) + `rag/` Pipeline | BM25+Embedding→RRF→CrossEncoder→BuildAgent→Faithfulness |
+| **Memory** | `agents/memory.py:ConversationMemory` | 短时（会话窗口）+ 长时（JSONL 持久化 + BM25 检索） |
+
+**PPAM 循环示例（用户问"这个 JD 适合我吗"）：**
+
+```
+Perception: 识别意图=analyze_job，提取关键词=[Python,RAG,Agent]
+     ↓
+Memory:    从对话历史召回相关上下文（之前分析过的岗位）
+     ↓
+Planning:  选择 langgraph_job_match 执行路径
+     ↓
+Action:    执行 8 步 LangGraph 工作流 → 返回匹配度 74% + 简历建议
+     ↓
+Memory:    存储本轮对话（用户问题 + 系统回答）
+```
+
+---
+
 ## 四、核心流程：JD → 分析 → 输出
 
 ### 4.1 完整数据流
