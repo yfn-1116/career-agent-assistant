@@ -98,7 +98,22 @@ interface → service → workflow → agent/rag → domain
 
 ---
 
-### 3.3 认知架构：Perception → Planning → Action → Memory
+### 3.3 Agent 设计：通用 Agent vs 垂直 Agent
+
+本系统的 Agent 不是通用对话助手，而是**垂直领域专用 Agent**——每个节点只做一件事，通过 LangGraph DAG 编排。
+
+| | 通用 Agent (OpenCode/Claude) | 本系统 (垂直 Agent) |
+|---|---|---|
+| 节点能力 | 通用——能读、能写、能执行 | **专用**——每个节点只做一件事 |
+| 谁决定下一步 | LLM 自主决策 | **LangGraph 图的边决定** |
+| Agent 关系 | 父 Agent 动态 spawn 子 Agent | **固定流水线**，10 个节点顺序执行 |
+| 上下文 | 子 Agent 独立 session | 所有节点**共享 State** |
+| 灵活性 | 极高 | 固定（6 种预定义意图） |
+| 可控性 | 低 | **高**（每一步必然执行） |
+| 成本 | 每次决策一次 LLM 调用 | **零额外 LLM 调用** |
+| 适用场景 | 开放式任务 | **结构化任务**（JD 分析） |
+
+### 3.4 认知架构：Perception → Planning → Action → Memory
 
 本系统采用认知 Agent 四组件架构（PPAM），将求职匹配任务映射到标准的智能体认知循环：
 

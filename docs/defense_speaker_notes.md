@@ -730,4 +730,77 @@ def handle(self, user_message):
 
 ---
 
+### 9.7 通用 Agent vs 垂直 Agent — 核心哲学差异
+
+**OpenCode = 通用士兵：**
+
+```
+用户: "修这个 bug"
+  │
+  ▼
+主 Agent (Coder) ← 有全部 10 个工具（bash, edit, write, view, grep, glob, ls, agent, fetch, sourcegraph）
+  │
+  ├─→ LLM 自主决定：先读代码，还是先搜索？要不要 spawn 子 Agent？
+  │
+  ├─→ spawn 子 Agent (Task) ← 只有 4 个只读工具（Glob, Grep, LS, View）
+  │     独立 session，看不到主 Agent 的上下文
+  │     只接收一个 Prompt 任务描述
+  │     执行完返回一条结果
+  │
+  ├─→ 收到子 Agent 结果 → 追加到历史 → 继续循环
+  │
+  └─→ LLM 说"完成" → 结束
+```
+
+**本项目 = 流水线工人：**
+
+```
+用户: "帮我分析这个 JD"
+  │
+  ▼
+OrchestratorAgent → 规则分类意图 → 选择执行路径
+  │
+  ▼
+LangGraph StateGraph（固定 DAG，10 个节点）
+  │
+  ├─→ parse_jd      ← 只做一件事：解析 JD 文本
+  ├─→ rewrite_query ← 只做一件事：构建检索查询
+  ├─→ retrieve      ← 只做一件事：BM25 + Embedding 双路检索
+  ├─→ rerank        ← 只做一件事：Cross-Encoder 精排
+  ├─→ grade         ← 只做一件事：5 维度评分
+  ├─→ analyze       ← 只做一件事：匹配分析
+  ├─→ build         ← 只做一件事：生成简历 + 话术
+  ├─→ faithfulness  ← 只做一件事：真实性检查
+  └─→ report        ← 只做一件事：写报告
+```
+
+**本质区别：**
+
+| | OpenCode (通用 Agent) | 本项目 (垂直 Agent) |
+|---|---|---|
+| 节点能力 | 通用——能读、能写、能执行 | 专用——每个节点只做一件事 |
+| 谁决定下一步 | **LLM 自主决策** | **LangGraph 图的边决定** |
+| Agent 关系 | 父 Agent **动态 spawn** 子 Agent | **固定流水线**，节点顺序不变 |
+| 任务传递 | 通过 `Prompt` 字符串 | 通过 LangGraph `State` dict |
+| 上下文 | 子 Agent **独立 session** | 所有节点 **共享 State** |
+| 权限 | 父强子弱（子 Agent 不能写文件） | 无权限分级（所有节点平等） |
+| 何时结束 | LLM 说停才停 | DAG 走到 END 就结束 |
+| 灵活性 | 极高（能处理任意新场景） | 固定（只能处理预定义意图） |
+| 可控性 | 低（LLM 可能跳步或不调工具） | 高（每一步必然执行） |
+| 成本 | 每次决策一次 LLM 调用 | 零额外 LLM 调用（规则驱动） |
+| 适用场景 | 开放式任务（编码、搜索、修改） | 结构化任务（JD 分析流程固定） |
+
+**为什么本项目选流水线而不是通用 Agent：**
+
+1. **场景固定**：求职匹配的流程是不变的（解析→检索→分析→生成），不需要 LLM 的"创造力"来决策下一步做什么
+2. **可靠性优先**：流水线保证每一步必然执行，不会出现"LLM 忘了做真实性检查"的情况
+3. **成本可控**：规则决策零 API 调用成本，适合学生项目
+4. **可解释性**：每一步都能追踪和诊断（PPAM trace + diagnostics JSON）
+
+**答辩话术：**
+
+> "OpenCode 是一个通用编码 Agent——它需要 LLM 自主决策什么时候读文件、什么时候改代码、什么时候 spawn 子 Agent 去搜索。但我的场景是求职匹配，流程是固定的：解析 JD → 检索经历 → 匹配分析 → 生成建议。所以我用 LangGraph 的确定性 DAG 替代了 LLM 自主决策——每个节点是一个专用 Agent，只做一件事。这样每一步必然执行、每一步可追踪、零额外 LLM 调用成本。通用 Agent 是士兵，我的 Agent 是流水线工人。士兵灵活但成本高，工人在固定岗位上效率最高。"
+
+---
+
 > 配合 PPT 使用：每个 PPT 章节对着阅读对应的 Speaker Notes 章节
