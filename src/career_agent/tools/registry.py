@@ -483,6 +483,54 @@ class GitHubRepoTool(Tool):
             return ToolResult(success=False, error=str(e), summary=f"github read failed: {repo_name}")
 
 
+class TaskAgentTool(Tool):
+    """Spawn a sub-agent for isolated parallel task execution.
+
+    Reference: OpenCode agent-tool.go (Agent-as-Tool pattern).
+    The sub-agent runs with restricted tools in an isolated context
+    and returns a single consolidated result.
+    """
+
+    name = "task_agent"
+    description = (
+        "启动一个子 Agent 执行独立任务。子 Agent 有自己的上下文，"
+        "看不到主对话的中间步骤。用于搜索、批量分析等可以独立完成的任务。"
+        "当你需要并行处理多个任务、或某个任务不需要主对话上下文时触发。"
+        "传入详细的 task 描述和 allowed_tools 列表。"
+    )
+
+    def run(self, task: str = "", allowed_tools: list[str] | None = None, **kwargs: Any) -> ToolResult:
+        if not task.strip():
+            return ToolResult(success=False, error="task is required", summary="empty task")
+
+        try:
+            from career_agent.agents.sub_agent import SubAgent
+            from career_agent.infrastructure.llm import create_llm_provider
+
+            llm = create_llm_provider()
+            if not llm.is_available:
+                return ToolResult(success=False, error="LLM not available for sub-agent")
+
+            sub = SubAgent(llm=llm, tool_registry=None, max_steps=8)
+            # Inject tool_registry at runtime
+            from career_agent.tools.registry import create_standard_registry
+            sub.tool_registry = create_standard_registry()
+
+            result = sub.execute(task=task, allowed_tools=allowed_tools)
+
+            return ToolResult(
+                success=result.success,
+                output={"answer": result.answer, "tools_called": result.tools_called},
+                summary=result.answer[:200] if result.success else f"sub-agent error: {result.error}",
+            )
+        except Exception as e:
+            return ToolResult(success=False, error=str(e), summary="sub-agent execution failed")
+
+    @property
+    def safety_notes(self) -> list[str]:
+        return ["子 Agent 不能修改文件", "子 Agent 独立上下文，不影响主对话"]
+
+
 # ---------------------------------------------------------------------------
 # Factory
 # ---------------------------------------------------------------------------
@@ -496,7 +544,7 @@ def create_standard_registry() -> ToolRegistry:
         RerankChunksTool, GradeRetrievalTool, SelectEvidenceTool,
         AnalyzeMatchTool, GenerateGroundedAnswerTool, CheckFaithfulnessTool,
         FallbackTool, WriteReportTool, WriteDiagnosticsTool,
-        WebSearchTool, GitHubRepoTool,
+        WebSearchTool, GitHubRepoTool, TaskAgentTool,
     ]:
         reg.register(tool_cls())
     return reg
