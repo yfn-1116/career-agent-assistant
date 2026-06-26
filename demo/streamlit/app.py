@@ -54,7 +54,23 @@ def _services() -> tuple[KnowledgeBaseService, ApplicationService, AgentRunServi
     app = ApplicationService()
     agent = AgentRunService(profile_dir=PROFILE_DIR)
     memory = ConversationMemory()
-    orch = OrchestratorAgent(memory=memory, kb_service=kb, agent_service=agent)
+
+    # Create LLM provider for autonomous mode
+    llm = None
+    try:
+        from career_agent.infrastructure.llm import create_llm_provider
+        llm = create_llm_provider()
+    except Exception:
+        pass
+
+    # Create ToolRegistry for autonomous mode
+    from career_agent.tools.registry import create_standard_registry
+    tools = create_standard_registry()
+
+    orch = OrchestratorAgent(
+        memory=memory, kb_service=kb, agent_service=agent,
+        tool_registry=tools, llm_provider=llm,
+    )
     return kb, app, agent, orch
 
 
