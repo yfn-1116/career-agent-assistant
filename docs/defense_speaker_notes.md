@@ -532,11 +532,84 @@ else:
 
 > 本项目的 Agent 设计参考了 OpenCode (github.com/opencode-ai/opencode) 的架构。
 
-### 9.1 OpenCode Agent 架构
+### 9.1 结构对比
 
-OpenCode 是一个 Go 语言实现的 AI 编码助手，Agent 架构核心在 `internal/llm/agent/agent.go`。
+```
+OpenCode agent struct                   本项目 OrchestratorAgent
+──────────────────────                  ──────────────────────────
+tools    []BaseTool          ←→         ToolRegistry (15 tools)
+provider Provider            ←→         QwenProvider / DeepSeekProvider
+messages Message.Service     ←→         ConversationMemory
+sessions Session.Service     ←→         session_state (Streamlit)
+Broker   pub/sub events      ←→         AgentResponse (同步返回)
+```
 
-**核心架构：**
+**结构上高度对应：Python 实现 vs Go 实现，同一套架构模式。**
+
+### 9.2 核心差异：循环方式
+
+这是两者最本质的区别。
+
+**OpenCode (agent.go:233-311) — LLM 自主决策循环：**
+
+```go
+func (a *agent) processGeneration(...) {
+    msgHistory := append(msgs, userMsg)
+
+    for {   // ← 无限循环，LLM 自己决定何时停
+        agentMessage, toolResults := a.streamAndHandleEvents(...)
+
+        if agentMessage.FinishReason == "tool_use" && toolResults != nil {
+            msgHistory = append(msgHistory, agentMessage, *toolResults)
+            continue   // ← 工具结果喂回 LLM，继续循环
+        }
+        return agentMessage   // ← LLM 说"结束"，返回
+    }
+}
+```
+
+**本项目 (orchestrator.py:56) — 规则驱动的单次执行：**
+
+```python
+def handle(self, user_message):
+    intent, keywords = self._perceive(user_message)     # 规则分类
+    plan = self._plan(intent, user_message)              # 规则规划
+    result = self._act(plan, user_message)               # 规则执行
+    return result   # ← 一次返回，不循环
+```
+
+### 9.3 对比总结
+
+| 维度 | OpenCode | 本项目 |
+|---|---|---|
+| **谁决定下一步** | **LLM 自主决策** | **规则 (Orchestrator._plan)** |
+| **循环机制** | `for {}` 无限循环 | 单次执行 |
+| **工具调用** | LLM 从 Tool list 中选 | ControlledPlanner 规则选 |
+| **灵活性** | 极高 | 固定（6 种预定义意图） |
+| **可控性** | 低 | 高（确定性执行） |
+| **成本** | 每次循环一次 LLM 调用 | 零额外 LLM 调用 |
+
+### 9.4 本项目参考了 OpenCode 的什么
+
+| OpenCode 设计模式 | 本项目对应实现 |
+|---|---|
+| `BaseTool` 接口 (`Info() + Run()`) | `Tool` ABC (`name + description + run()`) `tools/base.py:32` |
+| ToolRegistry (注册-获取-调用) | `ToolRegistry` (`register/get/invoke`) `tools/registry.py:14` |
+| Provider 抽象 (多模型切换) | `LLMProvider` + `ModelProvider` 双接口 `infrastructure/llm/base.py` |
+
+### 9.5 本项目做了但 OpenCode 没做的
+
+| 本项目 | OpenCode |
+|---|---|
+| **Evidence Gate** 四阶段证据约束 | ❌ |
+| **FaithfulnessChecker** 真实性验证 | ❌ |
+| **PPAM 认知架构** 显式建模 | ❌ |
+| **工业级 RAG Pipeline** (BM25+Embedding+RRF+CE) | ❌ (用的是 Sourcegraph 搜索) |
+| **确定性 DAG** (低成本、可解释) | ❌ (LLM 自主决策不透明) |
+
+### 9.6 答辩话术
+
+> "我参考了 OpenCode 的 Agent 架构设计，特别是它的 Tool 注册模式和 Provider 抽象。但针对求职匹配这个固定场景，我选择用确定性 DAG 替代 LLM 自主决策——因为流程是固定的（解析→检索→分析→生成），不需要 LLM 的'创造力'来决策下一步。这样更可控、更可解释、成本更低。同时在求职场景上我做了 OpenCode 没有的东西：Evidence Gate 防止编造经历、PPAM 认知架构显式建模、工业级 RAG Pipeline。"
 
 ```
 用户输入
