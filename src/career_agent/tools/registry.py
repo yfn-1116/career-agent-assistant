@@ -84,7 +84,7 @@ class ToolRegistry:
 
 class ParseJDTool(Tool):
     name = "parse_jd"
-    description = "Parse a raw job description into structured ParsedJD"
+    description = "解析岗位 JD 文本，提取岗位名称、方向、硬技能、加分技能、软技能和关键词。当用户粘贴或发送招聘信息、岗位描述、实习招聘文本时触发。"
 
     def run(self, raw_jd: str = "", **kwargs: Any) -> ToolResult:  # noqa: ARG002
         from career_agent.agents.jd_parser import JDParserAgent
@@ -104,7 +104,7 @@ class ParseJDTool(Tool):
 
 class PlanQueriesTool(Tool):
     name = "plan_queries"
-    description = "Generate retrieval queries from a parsed JD"
+    description = "根据解析后的 JD 生成检索查询词。已完成 JD 解析后自动生成查询，用于从知识库检索匹配经历。"
 
     def run(self, parsed_jd: Any = None, **kwargs: Any) -> ToolResult:  # noqa: ARG002
         from career_agent.agents.rag_retrieve_agent import RAGRetrieveAgent
@@ -126,7 +126,7 @@ class PlanQueriesTool(Tool):
 
 class RewriteQueryTool(Tool):
     name = "rewrite_query"
-    description = "Rewrite a retrieval query targeting missing keywords"
+    description = "当检索质量评分不达标时，根据缺失关键词重写查询以提高召回率。仅在检索评分 < 0.65 时触发。"
 
     def run(
         self, parsed_jd: Any = None, missing_keywords: list[str] | None = None,
@@ -149,7 +149,7 @@ class RewriteQueryTool(Tool):
 
 class RetrieveProfileTool(Tool):
     name = "retrieve_profile"
-    description = "Retrieve relevant chunks from user profile using Hybrid RAG"
+    description = "从用户知识库检索与 JD 相关的项目经历和技能证据。使用 BM25 关键词 + Embedding 语义双路混合检索。当需要查找用户是否具备某技能时触发。"
 
     def run(
         self, queries: list[str] | None = None, top_k: int = 5,
@@ -176,7 +176,7 @@ class RetrieveProfileTool(Tool):
 
 class RerankChunksTool(Tool):
     name = "rerank_chunks"
-    description = "Re-rank retrieved chunks by quality signals"
+    description = "对检索返回的候选片段进行精排，使用 Cross-Encoder 模型逐对打分，输出最相关的 top 5 片段。在检索完成后触发。"
 
     def run(
         self, retrieved_chunks: list[Any] | None = None,
@@ -211,7 +211,7 @@ class RerankChunksTool(Tool):
 
 class GradeRetrievalTool(Tool):
     name = "grade_retrieval"
-    description = "Evaluate retrieval quality with 5-dimension scoring"
+    description = "从证据数量、平均分数、关键词覆盖率、来源多样性、可追溯性 5 个维度评估检索质量。在精排完成后触发。"
 
     def run(
         self, query: str = "", evidence: list[Any] | None = None,
@@ -230,7 +230,7 @@ class GradeRetrievalTool(Tool):
 
 class SelectEvidenceTool(Tool):
     name = "select_evidence"
-    description = "Select best evidence items for generation grounding"
+    description = "从检索结果中筛选高质量证据片段（分数 ≥ 0.3），用于后续生成简历 bullet 和沟通话术。在评分完成后触发。"
 
     def run(
         self, retrieved_chunks: list[Any] | None = None,
@@ -258,7 +258,7 @@ class SelectEvidenceTool(Tool):
 
 class AnalyzeMatchTool(Tool):
     name = "analyze_match"
-    description = "Compare JD requirements against retrieved evidence"
+    description = "对比 JD 技能要求与检索到的用户证据，输出匹配优势、能力缺口、推荐项目和改进建议。当需要判断用户是否适合某岗位时触发。"
 
     def run(
         self, parsed_jd: Any = None, retrieved_chunks: list[Any] | None = None, **kwargs: Any,
@@ -276,7 +276,7 @@ class AnalyzeMatchTool(Tool):
 
 class GenerateGroundedAnswerTool(Tool):
     name = "generate_grounded_answer"
-    description = "Generate resume bullets and communication script from evidence"
+    description = "基于检索证据生成简历 bullet（按 evidence status 分级：可直接写入/需确认/仅学习计划）和 HR 沟通话术。当需要输出简历建议时触发。"
 
     def run(
         self, parsed_jd: Any = None, retrieved_chunks: list[Any] | None = None,
@@ -302,7 +302,7 @@ class GenerateGroundedAnswerTool(Tool):
 
 class CheckFaithfulnessTool(Tool):
     name = "check_faithfulness"
-    description = "Verify generated content is grounded in evidence"
+    description = "验证生成的简历 bullet 是否有证据支撑，检测夸大措辞（完整实现、大规模部署），无证据的声称将被拒绝。在生成输出后触发。"
 
     def run(
         self, generated_result: Any = None, retrieved_chunks: list[Any] | None = None, **kwargs: Any,
@@ -354,7 +354,7 @@ class CheckFaithfulnessTool(Tool):
 
 class FallbackTool(Tool):
     name = "fallback"
-    description = "Handle exhausted retries — produce safe output without fabrication"
+    description = "当检索质量经多次重试仍不达标时，生成安全输出，诚实告知用户当前资料不足以支撑完整分析。仅在检索耗尽时触发。"
 
     def run(
         self, missing_keywords: list[str] | None = None,
@@ -387,7 +387,7 @@ class FallbackTool(Tool):
 
 class WriteReportTool(Tool):
     name = "write_report"
-    description = "Write the final Markdown diagnostics report"
+    description = "将完整分析结果（JD 解析、检索证据、匹配分析、生成输出、真实性检查）写入 Markdown 诊断报告。在分析流程结束时触发。"
 
     def run(self, state: dict[str, Any] | None = None, output_dir: str = "outputs/demo", **kwargs: Any) -> ToolResult:
         from pathlib import Path
@@ -406,7 +406,7 @@ class WriteReportTool(Tool):
 
 class WriteDiagnosticsTool(Tool):
     name = "write_diagnostics"
-    description = "Write diagnostics JSON for the run"
+    description = "将工作流运行状态、工具调用追踪、重试历史写入 JSON 诊断文件，用于调试和离线评估。在报告写入后触发。"
 
     def run(self, state: dict[str, Any] | None = None, output_dir: str = "outputs/diagnostics", **kwargs: Any) -> ToolResult:
         from pathlib import Path
@@ -422,7 +422,7 @@ class WriteDiagnosticsTool(Tool):
 
 class WebSearchTool(Tool):
     name = "web_search"
-    description = "Search the web for company/industry/job information"
+    description = "搜索互联网获取公司背景、行业信息、岗位相关资讯。使用 DuckDuckGo。当用户询问公司情况或需要了解行业背景时触发。"
 
     @property
     def safety_notes(self) -> list[str]:
@@ -448,7 +448,7 @@ class WebSearchTool(Tool):
 
 class GitHubRepoTool(Tool):
     name = "github_repo"
-    description = "Read a public GitHub repo (README, docs, metadata)"
+    description = "拉取公开 GitHub 仓库的 README 和文档，分析项目技术栈并存入知识库。当用户粘贴 GitHub 链接或提到开源项目时触发。"
 
     @property
     def safety_notes(self) -> list[str]:

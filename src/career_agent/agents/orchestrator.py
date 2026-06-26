@@ -46,14 +46,46 @@ class OrchestratorAgent:
         memory: ConversationMemory | None = None,
         agent_service: Any = None,
         kb_service: Any = None,
+        autonomous: bool = False,
     ) -> None:
         self.memory = memory or ConversationMemory()
         self._agent_service = agent_service
         self._kb_service = kb_service
+        self._autonomous = autonomous
+        self._autonomous_agent: Any = None
+
+    def set_autonomous(self, enabled: bool, tool_registry: Any = None, llm_provider: Any = None) -> None:
+        """Enable or disable autonomous LLM-driven agent mode."""
+        self._autonomous = enabled
+        if enabled and tool_registry and llm_provider:
+            from career_agent.agents.autonomous_agent import AutonomousAgent
+            self._autonomous_agent = AutonomousAgent(
+                llm=llm_provider, tool_registry=tool_registry, memory=self.memory,
+            )
+        else:
+            self._autonomous_agent = None
 
     # -- PPAM Pipeline -------------------------------------------------------
 
     def handle(self, user_message: str) -> AgentResponse:
+        # === Autonomous mode: delegate to LLM-driven agent ===
+        if self._autonomous and self._autonomous_agent:
+            return self._handle_autonomous(user_message)
+        return self._handle_ppam(user_message)
+
+    def _handle_autonomous(self, user_message: str) -> AgentResponse:
+        """LLM-driven autonomous agent path."""
+        result = self._autonomous_agent.run(user_message)
+        return AgentResponse(
+            message=result.answer,
+            intent="autonomous",
+            data={"steps": len(result.steps), "tools_called": result.total_tools_called},
+            perception_summary="LLM 自主感知用户意图",
+            plan_summary=f"LLM 自主规划，共调用 {result.total_tools_called} 个工具",
+            action_summary=f"执行完毕：{[s.tool_called for s in result.steps]}",
+        )
+
+    def _handle_ppam(self, user_message: str) -> AgentResponse:
         """Full PPAM pipeline: Perceive → Plan → Act → Remember.
 
         Returns an AgentResponse with the result and metadata for debugging.
