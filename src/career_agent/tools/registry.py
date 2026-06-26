@@ -446,43 +446,6 @@ class WebSearchTool(Tool):
             return ToolResult(success=False, error=str(e), summary="web search failed")
 
 
-class GitHubRepoTool(Tool):
-    name = "github_repo"
-    description = "拉取公开 GitHub 仓库的 README 和文档，分析项目技术栈并存入知识库。当用户粘贴 GitHub 链接或提到开源项目时触发。"
-
-    @property
-    def safety_notes(self) -> list[str]:
-        return ["只读公开仓库", "不修改任何 GitHub 内容", "不使用 API key 访问私有仓库"]
-
-    def run(self, repo_name: str = "", **kwargs: Any) -> ToolResult:  # noqa: ARG002
-        if not repo_name.strip():
-            return ToolResult(success=False, error="repo_name is required")
-        try:
-            from career_agent.github.remote_repo_reader import GitHubRemoteReader
-            reader = GitHubRemoteReader()
-            docs = reader.read_repo(repo_name)
-            if docs:
-                snippets = [{"title": d.title, "source": d.source_path, "snippet": d.content[:200]} for d in docs]
-                return ToolResult(success=True, output={"repo": repo_name, "documents": snippets, "count": len(docs)},
-                                  summary=f"read {len(docs)} docs from {repo_name}")
-
-            # Fallback: try raw.githubusercontent.com (no rate limit)
-            import urllib.request
-            url = f"https://raw.githubusercontent.com/{repo_name}/main/README.md"
-            try:
-                req = urllib.request.Request(url, headers={"User-Agent": "smart-apply-agent"})
-                with urllib.request.urlopen(req, timeout=10) as resp:
-                    content = resp.read().decode("utf-8", errors="replace")
-                return ToolResult(success=True,
-                                  output={"repo": repo_name, "documents": [{"title": "README.md", "snippet": content[:500]}]},
-                                  summary=f"read README from {repo_name} (raw)")
-            except Exception:
-                return ToolResult(success=True, output={"repo": repo_name, "documents": [], "count": 0},
-                                  summary=f"unable to read {repo_name} (try setting GITHUB_TOKEN)")
-        except Exception as e:
-            return ToolResult(success=False, error=str(e), summary=f"github read failed: {repo_name}")
-
-
 class TaskAgentTool(Tool):
     """Spawn a sub-agent for isolated parallel task execution.
 
@@ -544,7 +507,15 @@ def create_standard_registry() -> ToolRegistry:
         RerankChunksTool, GradeRetrievalTool, SelectEvidenceTool,
         AnalyzeMatchTool, GenerateGroundedAnswerTool, CheckFaithfulnessTool,
         FallbackTool, WriteReportTool, WriteDiagnosticsTool,
-        WebSearchTool, GitHubRepoTool, TaskAgentTool,
+        WebSearchTool, TaskAgentTool,
     ]:
         reg.register(tool_cls())
+
+    # MCP-based tools (replace built-in equivalents)
+    try:
+        from career_agent.tools.mcp_github_tool import MCPGitHubTool
+        reg.register(MCPGitHubTool())
+    except Exception:
+        pass  # MCP GitHub server not available — skip
+
     return reg

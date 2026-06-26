@@ -123,7 +123,7 @@ REQUIRED_TOOLS = [
     "rerank_chunks", "grade_retrieval", "select_evidence",
     "analyze_match", "generate_grounded_answer", "check_faithfulness",
     "fallback", "write_report", "write_diagnostics",
-    "web_search", "github_repo",
+    "web_search", "github",
 ]
 
 
