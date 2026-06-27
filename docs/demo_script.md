@@ -2,7 +2,11 @@
 
 ## 打开
 
-浏览器输入：`http://localhost:8501`
+浏览器输入外网地址（演示前确认哪个可用）：
+
+- Cloudflare 隧道：`https://warm-declare-medal-altered.trycloudflare.com`
+- （每次重启需重新生成，跑 `cloudflared tunnel --url http://localhost:8501`）
+- 局域网：`http://192.168.1.91:8501`（同一 WiFi 下可用）
 
 ---
 
