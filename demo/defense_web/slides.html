@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>期末实训展示 — Evidence-Constrained Agent</title>
+<style>
+:root {
+  --bg: #0a101f; --surface: #131c2e; --border: #1e3050;
+  --text: #e2e8f0; --t2: #94a3b8; --t3: #64748b;
+  --cyan: #06b6d4; --c2: rgba(6,182,212,.15);
+  --green: #10b981; --g2: rgba(16,185,129,.15);
+  --amber: #f59e0b; --a2: rgba(245,158,11,.15);
+  --rose: #f43f5e; --r2: rgba(244,63,94,.15);
+  --purple: #8b5cf6; --p2: rgba(139,92,246,.15);
+  --font: 'Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif;
+  --font-title: 'Noto Serif SC','STSong',serif;
+  --font-mono: 'JetBrains Mono','Fira Code','Consolas',monospace;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background:var(--bg); color:var(--text); font-family:var(--font);
+  overflow:hidden; height:100vh; width:100vw; user-select:none;
+}
+body::before {
+  content:''; position:fixed; inset:0;
+  background: radial-gradient(ellipse at 30% 30%, rgba(6,182,212,.04) 0%, transparent 60%),
+              radial-gradient(ellipse at 70% 70%, rgba(139,92,246,.03) 0%, transparent 60%);
+  pointer-events:none; z-index:0;
+}
+.slide {
+  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  opacity:0; pointer-events:none; transition:opacity .4s; padding:40px 60px; z-index:1;
+}
+.slide.active { opacity:1; pointer-events:auto; }
+.si { max-width:1020px; width:100%; }
+.slide-num { position:absolute; bottom:20px; right:32px; font-family:var(--font-mono); font-size:12px; color:var(--t3); }
+.arrow-hint { position:absolute; bottom:20px; left:32px; font-size:12px; color:var(--t3); font-family:var(--font-mono); }
+h1 { font-family:var(--font-title); font-size:46px; font-weight:900; margin-bottom:12px; }
+h2 { font-family:var(--font-title); font-size:32px; font-weight:900; margin-bottom:8px; }
+h3 { font-size:17px; margin-bottom:6px; }
+.sub { font-size:16px; color:var(--t2); margin-bottom:8px; }
+.tag { display:inline-block; font-family:var(--font-mono); font-size:11px; padding:2px 10px; border-radius:99px; }
+.tag.c { background:var(--c2); color:var(--cyan); }
+.tag.g { background:var(--g2); color:var(--green); }
+.tag.a { background:var(--a2); color:var(--amber); }
+.tag.r { background:var(--r2); color:var(--rose); }
+.tag.p { background:var(--p2); color:var(--purple); }
+.box { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:18px; }
+.box.cy { border-left:3px solid var(--cyan); }
+.box.gr { border-left:3px solid var(--green); }
+.box.am { border-left:3px solid var(--amber); }
+.box.ro { border-left:3px solid var(--rose); }
+.box.pu { border-left:3px solid var(--purple); }
+.code { font-family:var(--font-mono); font-size:12px; color:var(--t3); }
+.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+.grid3 { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+.grid4 { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; }
+.flex-row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+.arrow { color:var(--t3); font-size:18px; }
+.badge { font-family:var(--font-mono); font-size:10px; padding:1px 8px; border-radius:99px; border:1px solid var(--border); color:var(--t2); }
+.center { text-align:center; }
+
+/* step flow */
+.flow-v { display:flex; flex-direction:column; gap:10px; }
+.flow-step { display:flex; gap:12px; align-items:flex-start; }
+.flow-num { width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-family:var(--font-mono); font-size:12px; font-weight:700; flex-shrink:0; background:var(--c2); color:var(--cyan); }
+.flow-card { flex:1; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:14px; font-size:13px; }
+.flow-card .fc-title { font-weight:600; margin-bottom:3px; }
+
+/* subagent cards */
+.sa-row { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
+.sa-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:12px; width:220px; font-size:12px; }
+.sa-card.par { border-left:3px solid var(--green); }
+.sa-card.seq { border-left:3px solid var(--amber); }
+.sa-card .sa-role { font-size:10px; color:var(--t2); margin-bottom:4px; }
+.sa-card .sa-perms { display:flex; gap:2px; flex-wrap:wrap; margin:6px 0; }
+.sa-card .sa-perms span { font-size:9px; font-family:var(--font-mono); padding:1px 6px; border-radius:3px; background:rgba(255,255,255,.05); color:var(--t2); }
+.sa-card .sa-io { font-size:10px; color:var(--t3); line-height:1.4; }
+
+/* subagent detail page */
+.sa-detail { background:var(--surface); border:1px solid var(--cyan); border-radius:14px; padding:20px 24px; }
+.sa-detail h4 { font-size:16px; margin-bottom:4px; }
+.sa-detail .sa-meta { display:flex; gap:6px; flex-wrap:wrap; margin:8px 0; }
+
+/* RAG */
+.rag-col { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:18px; }
+.rag-step { display:flex; gap:8px; padding:6px 0; border-bottom:1px solid rgba(255,255,255,.03); font-size:12px; align-items:flex-start; }
+.rag-step:last-child { border-bottom:none; }
+.rag-step .rs-num { width:22px; height:22px; border-radius:50%; background:var(--c2); color:var(--cyan); display:flex; align-items:center; justify-content:center; font-family:var(--font-mono); font-size:10px; font-weight:700; flex-shrink:0; }
+
+/* table */
+.tbl { width:100%; border-collapse:collapse; font-size:13px; }
+.tbl th { text-align:left; padding:8px 12px; border-bottom:1px solid var(--border); color:var(--t2); font-size:11px; text-transform:uppercase; letter-spacing:.5px; }
+.tbl td { padding:8px 12px; border-bottom:1px solid rgba(255,255,255,.03); }
+
+/* nav */
+.nav-bar { position:fixed; bottom:0; left:0; right:0; height:38px; display:flex; align-items:center; justify-content:center; gap:5px; z-index:100; }
+.nav-dot { width:6px; height:6px; border-radius:50%; background:var(--border); cursor:pointer; transition:all .2s; }
+.nav-dot.active { background:var(--cyan); width:20px; border-radius:99px; }
+.nav-dot.done { background:var(--t3); }
+.nav-label { position:fixed; bottom:44px; left:50%; transform:translateX(-50%); font-family:var(--font-mono); font-size:11px; color:var(--t2); z-index:100; }
+</style>
+</head>
+<body>
+
+<!-- SLIDE 1 — 项目介绍 (组员C) -->
+<div class="slide active"><div class="si center">
+  <div class="tag c" style="font-size:13px;letter-spacing:2px;margin-bottom:16px;">期末实训展示</div>
+  <h1>基于<span style="color:var(--cyan);">证据约束</span>的<br>智能实习投递 Agent</h1>
+  <div class="sub" style="font-size:18px;">Evidence-Constrained Internship Application Agent</div>
+  <div style="margin-top:32px;font-size:15px;color:var(--t3);">答辩人：XXX &nbsp;|&nbsp; 导师：XXX &nbsp;|&nbsp; 2026.06</div>
+</div><div class="slide-num">1/10</div><div class="arrow-hint">← → 翻页 &nbsp;|&nbsp; 1-3 跳章节</div></div>
+
+<!-- SLIDE 2 — 项目定位 (组员C) -->
+<div class="slide"><div class="si">
+  <h2>项目定位</h2>
+  <div class="sub">用户做了什么 → 系统输出什么</div>
+  <div style="margin-top:20px;">
+    <div class="flex-row" style="justify-content:center;gap:40px;">
+      <div style="text-align:center;">
+        <div style="font-size:14px;color:var(--t2);margin-bottom:12px;">👤 用户做了什么</div>
+        <div class="box gr" style="width:260px;text-align:left;font-size:14px;line-height:2.2;">
+          📋 粘贴一段 JD 文本<br>
+          📄 上传 PDF 简历<br>
+          💻 丢一个 GitHub 链接
+        </div>
+      </div>
+      <div class="arrow" style="font-size:28px;">→</div>
+      <div style="text-align:center;">
+        <div style="font-size:14px;color:var(--t2);margin-bottom:12px;">🤖 系统输出什么</div>
+        <div class="box cy" style="width:360px;text-align:left;font-size:14px;line-height:2.2;">
+          ✅ 哪些项目跟这个岗位相关？匹配度？<br>
+          ✅ 简历上这些项目应该怎么写？（三档分类）<br>
+          ✅ 每句话的证据来源是什么？
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:28px;text-align:center;font-size:16px;color:var(--cyan);">
+      核心原则：所有输出必须基于证据，不得编造
+    </div>
+  </div>
+</div><div class="slide-num">2/10</div><div class="arrow-hint">← → 翻页</div></div>
+
+<!-- SLIDE 3 — Demo 输入展示 (组员B) -->
+<div class="slide"><div class="si">
+  <h2>Demo：用户做了什么</h2>
+  <div class="sub">真实场景 — 用户粘贴 JD、上传 PDF 简历、丢 GitHub 链接</div>
+  <div class="grid2" style="margin-top:16px;">
+    <div class="box am">
+      <h3>📋 粘贴的 JD（纯文本）</h3>
+      <div style="font-size:13px;color:var(--t2);line-height:1.8;">
+        <strong>Agent开发实习生</strong> (140-190元/天)<br>
+        深圳 · 5天/周 · 最少3个月<br><br>
+        <strong>岗位职责：</strong><br>
+        · 负责 AI Agent 系统开发优化<br>
+        · 记忆模块、规划模块、工具调用模块<br>
+        · 开发基于 LLM 的智能体系统<br>
+        · 设计 Agent 工具使用接口<br>
+        · 开发知识库管理系统<br><br>
+        <strong>任职要求：</strong><br>
+        · 熟悉 Python、Java<br>
+        · 熟悉 LLM 原理和应用<br>
+        · 了解机器学习、深度学习
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div class="box gr">
+        <h3>📄 上传的 PDF 简历</h3>
+        <div style="font-size:13px;color:var(--t2);">陈小明 · XX大学 · 化学+CS<br>Python(3年) · FastAPI · Docker<br>4个项目 · 2段实习</div>
+      </div>
+      <div class="box pu">
+        <h3>💻 丢的 GitHub 链接</h3>
+        <div style="font-size:13px;color:var(--t2);">github.com/yfn-1116/<br>career-agent-assistant<br>RAG求职Agent · 15⭐</div>
+      </div>
+    </div>
+  </div>
+  <div style="margin-top:16px;text-align:center;font-size:14px;color:var(--cyan);">
+    用户就做了这三件事。LLM 自己判断意图，自动调 Agent 处理。
+  </div>
+</div><div class="slide-num">3/10</div></div>
+
+<!-- SLIDE 4 — Demo 输出①：哪些项目相关 (组员B) -->
+<div class="slide"><div class="si">
+  <h2>Demo：哪些项目跟这个 JD 相关？</h2>
+  <div class="sub">系统从你的经历中检索并匹配</div>
+  <div style="display:flex;flex-direction:column;gap:12px;margin-top:16px;">
+    <div class="box gr">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <h3>✅ SmartApplyAgent — RAG 智能求职助手</h3>
+        <span class="tag g">implemented · 匹配 0.89</span>
+      </div>
+      <div style="font-size:13px;color:var(--t2);margin-top:4px;">
+        匹配 JD 需求：Agent系统开发 · 工具调用模块 · 知识库管理 · 对话系统 · Python<br>
+        <span class="code">来源: github.com/yfn-1116/career-agent-assistant</span>
+      </div>
+    </div>
+    <div class="box gr">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <h3>✅ 智能滴定系统 — 视觉滴定终点检测</h3>
+        <span class="tag g">implemented · 匹配 0.62</span>
+      </div>
+      <div style="font-size:13px;color:var(--t2);margin-top:4px;">
+        匹配 JD 需求：Python · 工程实践 · 系统设计能力<br>
+        <span class="code">来源: github.com/yfn-1116/auto-titration-system</span>
+      </div>
+    </div>
+    <div class="box am">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <h3>⚠️ PolyU 智能导航 — 校园路径规划</h3>
+        <span class="tag a">designed · 匹配 0.55</span>
+      </div>
+      <div style="font-size:13px;color:var(--t2);margin-top:4px;">
+        匹配 JD 需求：系统架构设计 · API 集成<br>
+        <span class="code">来源: github.com/yfn-1116/polyu-smart-journey</span>
+      </div>
+    </div>
+  </div>
+  <div style="margin-top:12px;font-size:14px;">
+    JD 核心需求覆盖：<span style="color:var(--green);">✅ Agent系统开发 ✅ 工具调用 ✅ 知识库管理 ✅ 对话系统 ✅ Python</span>&nbsp;&nbsp;<span style="color:var(--amber);">⚠️ Java</span>&nbsp;&nbsp;<span style="color:var(--t3);">📋 机器学习</span>
+  </div>
+</div><div class="slide-num">4/10</div></div>
+
+<!-- SLIDE 5 — Demo 输出②：简历怎么写 (组员B) -->
+<div class="slide"><div class="si">
+  <h2>Demo：简历怎么写？（三档分类）</h2>
+  <div class="sub">基于证据等级，不是基于模型"想象"</div>
+  <div style="display:flex;flex-direction:column;gap:12px;margin-top:14px;">
+    <div class="box gr">
+      <h3>✅ 可以直接写进简历的 <span class="tag g">implemented 证据</span></h3>
+      <div style="font-size:13px;color:var(--t2);line-height:1.8;">
+        "独立开发 AI Agent 智能求职助手，基于 LangGraph 实现多 Agent 协作框架。设计并实现工具调用模块(task_agent)，支持 Agent 动态调度与递归生成。构建 RAG 知识库管理系统(BM25+向量+重排序)。开发 Streamlit 对话交互界面。"<br>
+        <span class="code">[证据: career-agent-assistant | 等级: implemented]</span>
+      </div>
+    </div>
+    <div class="box am">
+      <h3>⚠️ 需要确认后才能写的 <span class="tag a">designed 证据</span></h3>
+      <div style="font-size:13px;color:var(--t2);line-height:1.8;">
+        "设计基于 FastAPI + PostgreSQL 的校园导航后端，实现 RESTful API 与外部地图服务集成"<br>
+        <span class="code">[证据: polyu-smart-journey | 等级: designed — 仅设计，需确认]</span>
+      </div>
+    </div>
+    <div class="box" style="border-left:3px solid var(--t3);">
+      <h3>📋 建议补充实践后再写的 <span style="color:var(--t3);">无对应证据</span></h3>
+      <div style="font-size:13px;color:var(--t2);">
+        Java — 知识库中无相关实现经历，建议补充实践 &nbsp;|&nbsp; 机器学习/深度学习 — 无直接项目经验，建议补充 Demo
+      </div>
+    </div>
+  </div>
+  <div style="margin-top:12px;text-align:center;font-size:15px;color:var(--cyan);">
+    核心能力：基于真实证据，告诉你能写什么、不能写什么、还需要补什么
+  </div>
+</div><div class="slide-num">5/10</div></div>
+
+<!-- SLIDE 6 — Agent 四要素 (组员C) -->
+<div class="slide"><div class="si">
+  <h2>Agent 系统的四个要素</h2>
+  <div class="sub">Demo 背后是这个四层架构在运转</div>
+  <div class="grid4" style="margin-top:20px;">
+    <div class="box gr" style="text-align:center;">
+      <div style="font-size:28px;margin-bottom:8px;">🔍</div>
+      <h3>Perception 感知</h3>
+      <div style="font-size:13px;color:var(--t2);line-height:1.8;">
+        JD 文本 → 结构化技能<br>
+        PDF → 提取文本<br>
+        GitHub 链接 → 仓库内容
+      </div>
+    </div>
+    <div class="box am" style="text-align:center;">
+      <div style="font-size:28px;margin-bottom:8px;">🧠</div>
+      <h3>Planning 规划</h3>
+      <div style="font-size:13px;color:var(--t2);line-height:1.8;">
+        LLM 识别意图<br>
+        决定调哪个 Agent<br>
+        决定并行/串行
+      </div>
+    </div>
+    <div class="box cy" style="text-align:center;">
+      <div style="font-size:28px;margin-bottom:8px;">⚡</div>
+      <h3>Action 执行</h3>
+      <div style="font-size:13px;color:var(--t2);line-height:1.8;">
+        RAG 检索知识库<br>
+        匹配分析<br>
+        证据校验
+      </div>
+    </div>
+    <div class="box pu" style="text-align:center;">
+      <div style="font-size:28px;margin-bottom:8px;">💾</div>
+      <h3>Memory 记忆</h3>
+      <div style="font-size:13px;color:var(--t2);line-height:1.8;">
+        短期: 对话上下文<br>
+        长期: JSONL 持久化<br>
+        知识库: RAG 索引
+      </div>
+    </div>
+  </div>
+  <div style="margin-top:16px;text-align:center;font-size:13px;color:var(--t2);">
+    ═══ RAG 横切四层 ═══ &nbsp; 写入: Perception → Memory &nbsp;|&nbsp; 读取: Memory → Action
+  </div>
+  <div style="margin-top:12px;text-align:center;font-size:14px;color:var(--t3);">接下来由 XXX 深入讲架构设计 →</div>
+</div><div class="slide-num">6/10</div></div>
+
+<!-- SLIDE 7 — 总体架构 (你) ⭐ -->
+<div class="slide"><div class="si">
+  <h2>系统总体架构</h2>
+  <div class="sub">用户操作 → 调度层决策 → 能力层执行 → 基础设施 → 存储</div>
+  <div style="margin-top:14px;">
+    <div class="flex-row" style="justify-content:center;margin-bottom:10px;">
+      <span class="badge" style="font-size:12px;color:var(--t2);">📋粘贴JD</span>
+      <span class="badge" style="font-size:12px;color:var(--t2);">📄上传PDF</span>
+      <span class="badge" style="font-size:12px;color:var(--t2);">💻丢GitHub链接</span>
+      <span class="arrow">▼</span>
+    </div>
+    <div class="box cy" style="margin-bottom:10px;">
+      <h3>调度层：OrchestratorAgent</h3>
+      <div style="font-size:13px;color:var(--t2);">
+        LLM 收到消息 → 判断意图："这是岗位分析任务" → 决定：先解析JD+索引知识库 → 再检索匹配 → 再分析 → 最后生成<br>
+        <span class="code">不是写死的 if-else，是 LLM 自己做的决策。LLM 不可用时回退 LangGraph DAG。</span>
+      </div>
+    </div>
+    <div class="flex-row" style="justify-content:center;">
+      <div class="box gr" style="flex:1;text-align:center;">
+        <h3>能力层</h3>
+        <div style="font-size:12px;color:var(--t2);">
+          parse_jd → retrieve → analyze → generate → check<br>
+          16 个 Tool · Skill + MCP + SubAgent 三层实现
+        </div>
+      </div>
+      <div class="box am" style="flex:1;text-align:center;">
+        <h3>基础设施</h3>
+        <div style="font-size:12px;color:var(--t2);">
+          LLM(Qwen/DeepSeek/Mock)<br>
+          Embedding(1024维) · RAG Pipeline · MCP
+        </div>
+      </div>
+      <div class="box pu" style="flex:1;text-align:center;">
+        <h3>存储层</h3>
+        <div style="font-size:12px;color:var(--t2);">
+          短期(20条) · 长期(JSONL+BM25)<br>
+          知识库(chunks.jsonl)
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:12px;text-align:center;font-size:14px;color:var(--cyan);">
+      关键设计：LLM 不自己干活——它生成子 Agent 去干活。接下来展开 →
+    </div>
+  </div>
+</div><div class="slide-num">7/10</div></div>
+
+<!-- SLIDE 8 — 主Agent决策过程 (你) ⭐ -->
+<div class="slide"><div class="si">
+  <h2>主 Agent 怎么分派任务？</h2>
+  <div class="sub">OrchestratorAgent 的 LLM 决策循环 — 以这个 JD 为例</div>
+  <div class="flow-v" style="margin-top:14px;font-size:13px;">
+    <div class="flow-step">
+      <div class="flow-num">1</div>
+      <div class="flow-card">
+        <div class="fc-title">LLM 判断 → "需要解析 JD 并索引知识库"</div>
+        <div style="color:var(--t2);">调 <span class="tag c">task_agent</span>("解析JD+索引PDF和GitHub", <span class="tag g">[parse_jd, web_search]</span>) → 生成 <strong>SubAgent-1</strong></div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num">2</div>
+      <div class="flow-card">
+        <div class="fc-title">LLM 判断 → "需要检索匹配的经历" ⚡与 Step1 并行</div>
+        <div style="color:var(--t2);">调 <span class="tag c">task_agent</span>("检索Agent开发相关经历", <span class="tag a">[retrieve_profile, github_repo]</span>) → 生成 <strong>SubAgent-2</strong></div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num">3</div>
+      <div class="flow-card">
+        <div class="fc-title">LLM 判断 → "需要分析匹配度" 🔗 依赖 Step2 结果</div>
+        <div style="color:var(--t2);">调 <span class="tag c">task_agent</span>("分析JD和证据的匹配度", <span class="tag p">[analyze_match, grade_retrieval]</span>) → 生成 <strong>SubAgent-3</strong></div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num">4</div>
+      <div class="flow-card">
+        <div class="fc-title">LLM 判断 → "生成简历建议"</div>
+        <div style="color:var(--t2);">调 <span class="tag c">task_agent</span>("生成简历建议", <span class="tag r">[generate_answer, check_faithfulness, write_report]</span>) → 生成 <strong>SubAgent-4</strong></div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num">5</div>
+      <div class="flow-card">
+        <div class="fc-title">LLM 判断 → "任务完成，回复用户"</div>
+        <div style="color:var(--t2);">不再调 Tool，直接输出最终答案给用户</div>
+      </div>
+    </div>
+  </div>
+  <div style="margin-top:12px;text-align:center;font-size:14px;color:var(--cyan);">
+    主 Agent 不干活，只做决策。干活的是子 Agent。
+  </div>
+</div><div class="slide-num">8/10</div></div>
+
+<!-- SLIDE 9 — 子Agent执行与回传 (你) ⭐ -->
+<div class="slide"><div class="si">
+  <h2>子 Agent 怎么执行、怎么回传？</h2>
+  <div class="sub">以 SubAgent-1（感知·解析专家）为例</div>
+  <div class="grid2" style="margin-top:16px;">
+    <div>
+      <div class="sa-detail">
+        <h4>📄 SubAgent-1：感知·解析专家</h4>
+        <div class="sa-meta">
+          <span class="tag g">Role: 信息采集专家</span>
+          <span class="tag c">Session: 独立上下文</span>
+          <span class="tag a">max_steps: 8</span>
+        </div>
+        <div style="font-size:13px;color:var(--t2);margin-top:8px;">
+          <strong>System Prompt:</strong> "你是信息采集专家，解析所有输入并索引到知识库。"<br><br>
+          <strong>Permissions:</strong> <span class="tag g">parse_jd</span> <span class="tag g">web_search</span><br><br>
+          <strong>执行过程：</strong><br>
+          ① 调 parse_jd(JD文本) → {job_title, hard_skills: [Python, Java, LLM, Agent, 工具调用, 知识库管理, 对话系统...], direction: "agent"}<br>
+          ② 调 FileLoader(PDF) → pypdf提取 → TextChunker分块(800字) → SHA256 ID<br>
+          ③ 写入 chunks.jsonl → 3个chunk索引完成<br>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div style="font-size:14px;color:var(--t2);margin-bottom:8px;">通信流程：</div>
+      <div class="box cy" style="margin-bottom:8px;font-size:13px;">
+        <strong>① 主Agent调 task_agent</strong><br>
+        <span style="color:var(--t2);">task = "解析JD文本，索引PDF和GitHub到知识库"<br>allowed_tools = [parse_jd, web_search]</span>
+      </div>
+      <div style="text-align:center;font-size:18px;color:var(--cyan);margin:4px 0;">▼</div>
+      <div class="box gr" style="margin-bottom:8px;font-size:13px;">
+        <strong>② SubAgent-1 独立执行</strong><br>
+        <span style="color:var(--t2);">自己的 System Prompt + 自己的上下文<br>不受其他 Agent 干扰</span>
+      </div>
+      <div style="text-align:center;font-size:18px;color:var(--cyan);margin:4px 0;">▼</div>
+      <div class="box am" style="font-size:13px;">
+        <strong>③ 返回 SubAgentResult</strong><br>
+        <span style="color:var(--t2);">{answer: "JD已解析, PDF索引3chunk", tools_called: ["parse_jd", "web_search"]}</span>
+      </div>
+      <div style="margin-top:8px;font-size:12px;color:var(--t3);text-align:center;">
+        子 Agent 也能再调 task_agent → 生成孙 Agent（递归）<br>
+        终止条件：max_steps 硬限制
+      </div>
+    </div>
+  </div>
+</div><div class="slide-num">9/10</div></div>
+
+<!-- SLIDE 10 — 四个子Agent全貌 (你) ⭐ -->
+<div class="slide"><div class="si">
+  <h2>四个子 Agent 全貌</h2>
+  <div class="sub">Role（角色）× Permissions（权限）× Session（上下文）三维解耦</div>
+  <div class="sa-row" style="margin-top:16px;">
+    <div class="sa-card par">
+      <strong>📄 SubAgent-1</strong>
+      <div class="sa-role">感知·解析专家</div>
+      <div class="sa-perms"><span>parse_jd</span><span>web_search</span></div>
+      <div style="font-size:11px;font-weight:600;color:var(--green);">⚡ 并行</div>
+      <div class="sa-io">← JD+PDF+GitHub<br>→ ParsedJD + 索引确认</div>
+    </div>
+    <div class="sa-card par">
+      <strong>🔍 SubAgent-2</strong>
+      <div class="sa-role">检索·知识专家</div>
+      <div class="sa-perms"><span>retrieve_profile</span><span>github_repo</span></div>
+      <div style="font-size:11px;font-weight:600;color:var(--green);">⚡ 并行</div>
+      <div class="sa-io">← JD技能列表<br>→ Evidence[3] + Grade</div>
+    </div>
+    <div class="sa-card seq">
+      <strong>⚖️ SubAgent-3</strong>
+      <div class="sa-role">分析·匹配专家</div>
+      <div class="sa-perms"><span>analyze_match</span><span>grade_retrieval</span></div>
+      <div style="font-size:11px;font-weight:600;color:var(--amber);">🔗 串行</div>
+      <div class="sa-io">← ParsedJD + Evidence[]<br>→ MatchAnalysis</div>
+      <div style="margin-top:6px;padding:6px;border:1px dashed var(--purple);border-radius:6px;font-size:10px;text-align:center;">
+        ↳ <strong>SubAgent-3-1</strong> (递归!)<br><span class="tag p">check_faithfulness</span><br>→ can_write:2 · confirm:1
+      </div>
+    </div>
+    <div class="sa-card seq">
+      <strong>✏️ SubAgent-4</strong>
+      <div class="sa-role">生成·输出专家</div>
+      <div class="sa-perms"><span>generate_answer</span><span>write_report</span></div>
+      <div style="font-size:11px;font-weight:600;color:var(--amber);">🔗 串行</div>
+      <div class="sa-io">← MatchAnalysis<br>→ bullets + message + report</div>
+    </div>
+  </div>
+  <div style="margin-top:16px;font-size:14px;text-align:center;">
+    <span style="color:var(--green);">● 并行：SubAgent-1 ∥ SubAgent-2（无数据依赖，LLM 同步生成）</span><br>
+    <span style="color:var(--amber);">● 串行：SubAgent-3 等 SubAgent-2 结果，SubAgent-4 等 SubAgent-3 结果</span><br>
+    <span style="color:var(--purple);">● 递归：SubAgent-3 → 生成 SubAgent-3-1（Agent 生成 Agent）</span>
+  </div>
+  <div class="code" style="margin-top:10px;text-align:center;">代码: orchestrator.py:70 · autonomous_agent.py:56 · sub_agent.py:39 · registry.py:488</div>
+</div><div class="slide-num">10/10</div></div>
+
+<!-- SLIDE 11 — RAG (你) ⭐ -->
+<div class="slide"><div class="si">
+  <h2>RAG：知识库的数据怎么进去、怎么查出来</h2>
+  <div class="sub">写入路径（Perception→Memory） + 读取路径（Memory→Action）</div>
+  <div class="grid2" style="margin-top:14px;">
+    <div class="rag-col">
+      <h3 style="font-size:15px;">📥 写入路径</h3>
+      <div class="rag-step"><div class="rs-num">1</div><div>PDF简历 → pypdf 提取文本</div></div>
+      <div class="rag-step"><div class="rs-num">2</div><div>GitHub链接 → MCP(JSON-RPC) 调 npx 读 README<br><span class="code">失败回退: urllib 直接 GET raw</span></div></div>
+      <div class="rag-step"><div class="rs-num">3</div><div>TextChunker 滑动窗口分块(chunk=800, overlap=100)</div></div>
+      <div class="rag-step"><div class="rs-num">4</div><div>SHA256 document_id → 追加 chunks.jsonl</div></div>
+    </div>
+    <div class="rag-col">
+      <h3 style="font-size:15px;">📤 读取路径（查询: "Python Agent LLM 工具调用 知识库管理"）</h3>
+      <div class="rag-step"><div class="rs-num">1</div><div>jieba 中文分词 → token 集合</div></div>
+      <div class="rag-step"><div class="rs-num">2</div><div><strong>双路并行粗召回</strong> (各取 top 80)<br><span class="tag g">BM25 关键词</span> ⊕ <span class="tag c">Qwen Embedding 语义(1024维)</span><br><span class="code">互补：BM25保准确，Embedding保召回</span></div></div>
+      <div class="rag-step"><div class="rs-num">3</div><div><strong>RRF 融合</strong> (k=60, → top 30)<br><span class="code">只关心排序位置，不关心分数绝对值，零参数</span></div></div>
+      <div class="rag-step"><div class="rs-num">4</div><div><strong>CrossEncoder 精排</strong> (→ top 5)<br><span class="code">bge-reranker-base 279M · query+chunk 拼一起过Transformer</span></div></div>
+      <div class="rag-step"><div class="rs-num">5</div><div>FaithfulnessChecker (阈值 0.75)</div></div>
+      <div class="rag-step"><div class="rs-num">6</div><div><strong>EvidenceGate 四级约束</strong><br><span style="color:var(--green);">✅ implemented→可写</span> <span style="color:var(--amber);">⚠️ designed→需确认</span> <span style="color:var(--rose);">❌ planned→禁止</span></div></div>
+    </div>
+  </div>
+  <div style="margin-top:10px;padding:8px 14px;background:var(--a2);border-radius:8px;font-size:12px;color:var(--amber);text-align:center;">
+    ⚡ API 不可用 → 轻量回退：BM25 + 五维规则打分，<50ms，零网络依赖
+  </div>
+</div><div class="slide-num">11/10</div></div>
+
+<!-- SLIDE 12 — 回顾 (组员D) -->
+<div class="slide"><div class="si">
+  <h2>回顾三个核心设计</h2>
+  <div class="grid3" style="margin-top:20px;">
+    <div class="box cy" style="text-align:center;">
+      <div style="font-size:32px;margin-bottom:8px;">🌳</div>
+      <h3>Agent 递归树</h3>
+      <div style="font-size:13px;color:var(--t2);line-height:1.8;">
+        主Agent决策 → 子Agent执行<br>
+        Role×Permissions×Session<br>
+        并行+串行+递归
+      </div>
+    </div>
+    <div class="box am" style="text-align:center;">
+      <div style="font-size:32px;margin-bottom:8px;">🔧</div>
+      <h3>RAG 全链路</h3>
+      <div style="font-size:13px;color:var(--t2);line-height:1.8;">
+        写入: PDF/GitHub→分块→索引<br>
+        读取: BM25+Embedding→RRF→精排<br>
+        API不可用时自动降级
+      </div>
+    </div>
+    <div class="box gr" style="text-align:center;">
+      <div style="font-size:32px;margin-bottom:8px;">🛡️</div>
+      <h3>EvidenceGate</h3>
+      <div style="font-size:13px;color:var(--t2);line-height:1.8;">
+        implemented→✅可写<br>
+        designed→⚠️需确认<br>
+        planned→❌禁止
+      </div>
+    </div>
+  </div>
+  <div style="margin-top:16px;font-size:14px;text-align:center;color:var(--t2);">
+    三个局限：语义检索依赖外部 API · 大规模并发未验证 · 测评数据集有限
+  </div>
+  <div style="margin-top:20px;text-align:center;font-size:16px;">欢迎各位老师提问 🙋</div>
+</div><div class="slide-num">12/10</div></div>
+
+<div class="nav-label" id="navLabel"></div>
+<div class="nav-bar" id="navBar"></div>
+
+<script>
+const total = 12;
+let cur = 0;
+function render() {
+  document.getElementById('navBar').innerHTML = Array.from({length:total},(_,i)=>
+    `<div class="nav-dot${i===cur?' active':''}${i<cur?' done':''}" onclick="go(${i})"></div>`
+  ).join('');
+  document.getElementById('navLabel').textContent = `${cur+1}/${total}`;
+}
+function go(i) {
+  if(i<0||i>=total) return;
+  document.querySelectorAll('.slide').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.slide')[i].classList.add('active');
+  cur=i; render();
+}
+document.addEventListener('keydown', e => {
+  if(e.key==='ArrowRight'||e.key==='ArrowDown'||e.key===' ') { e.preventDefault(); go(cur+1); }
+  else if(e.key==='ArrowLeft'||e.key==='ArrowUp') { e.preventDefault(); go(cur-1); }
+  else if(e.key==='Home') { e.preventDefault(); go(0); }
+  else if(e.key==='End') { e.preventDefault(); go(total-1); }
+  else if(e.key==='1') go(6); // 架构
+  else if(e.key==='2') go(7); // Agent决策
+  else if(e.key==='3') go(10); // RAG
+});
+let tx=0;
+document.addEventListener('touchstart', e=>{ tx=e.touches[0].clientX; });
+document.addEventListener('touchend', e=>{
+  const dx=e.changedTouches[0].clientX-tx;
+  if(Math.abs(dx)>60) go(dx<0?cur+1:cur-1);
+});
+render();
+</script>
+</body>
+</html>

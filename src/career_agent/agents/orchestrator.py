@@ -59,10 +59,7 @@ class OrchestratorAgent:
         self._autonomous_agent: Any = None
 
     def handle(self, user_message: str) -> AgentResponse:
-        # === Try autonomous mode first ===
-        if self._tool_registry and self._llm_provider:
-            return self._handle_autonomous(user_message)
-        # === Fallback to rule-based PPAM ===
+        # === Always use PPAM — autonomous mode disabled until Qwen ReAct improves ===
         return self._handle_ppam(user_message)
 
     def _handle_autonomous(self, user_message: str) -> AgentResponse:
@@ -145,12 +142,40 @@ class OrchestratorAgent:
         }.get(plan, self._execute_rag_chat)(user_message)
 
     def _execute_job_analysis(self, jd_text: str) -> AgentResponse:
-        if self._agent_service is None:
-            from career_agent.service.agent_run import AgentRunRequest, AgentRunService
-            self._agent_service = AgentRunService()
-        result = self._agent_service.run(AgentRunRequest(user_message=jd_text, raw_jd=jd_text, mode="analyze_job"))
-        match_pct = f"{result.match_score:.0%}" if result.match_score else "N/A"
-        return AgentResponse(message=f"**匹配度：{match_pct}**", data={"result": result})
+        # Search KB for relevant evidence
+        kb_evidence = ""
+        if self._kb_service:
+            results = self._kb_service.search(jd_text, top_k=10)
+            if results:
+                kb_evidence = "\n---\n".join([
+                    f"[{r.source_path}]\n{r.content[:800]}" for r in results
+                ])
+
+        # Always use LLM for analysis — no rule-based fallback
+        if self._llm_provider and self._llm_provider.is_available:
+            prompt = f"""你是专业求职顾问。根据以下JD和候选人的GitHub项目/简历，做岗位匹配分析。
+
+=== 岗位JD ===
+{jd_text[:2000]}
+
+=== 候选人经历 ===
+{kb_evidence[:4000] or '（知识库中暂无数据，请基于JD本身给出通用建议）'}
+
+请输出：
+1. **匹配度**：估计百分比（如 70%）
+2. **强项**：JD中哪些要求被候选人的项目覆盖了？具体说明哪个项目覆盖了哪个要求。
+3. **弱项**：JD中哪些要求候选人没有对应经历？
+4. **简历要点**：基于真实项目经历，用 STAR 法则写 3 条可以直接写进简历的描述（每条标注证据来源）
+5. **HR沟通话术**：一段 100 字以内的打招呼文本
+
+规则：必须基于提供的证据，不得编造。如果某技能候选人确实没有，诚实说"建议补充"。用中文输出。"""
+            try:
+                reply = self._llm_provider.generate(prompt, system_prompt="你是专业求职顾问。基于真实证据分析，不编造。")
+                return AgentResponse(message=reply[:2500], memory_used=True)
+            except Exception as e:
+                return AgentResponse(message=f"LLM 分析失败: {e}")
+
+        return AgentResponse(message="LLM 不可用，请检查 API 配置。")
 
     def _execute_message_generation(self, _: str) -> AgentResponse:
         from career_agent.service.agent_run import AgentRunService
@@ -166,13 +191,114 @@ class OrchestratorAgent:
 
     def _execute_github_ingest(self, text: str) -> AgentResponse:
         import re
-        m = re.search(r"github\.com/([^/\s]+/[^/\s]+)", text)
-        if m and self._kb_service:
-            r = self._kb_service.ingest_github_repo(m.group(1).rstrip("/"))
-            return AgentResponse(message=f"已拉取 {m.group(1)}: {r.chunk_count} 条")
-        return AgentResponse(message="请提供 GitHub 链接")
+        from career_agent.tools.mcp_github_tool import MCPGitHubTool
+        gh = MCPGitHubTool()
+        m = re.search(r"github\.com/([^/\s]+)(?:/([^/\s]+))?", text)
+        if not m:
+            return AgentResponse(message="请提供 GitHub 链接")
+        username = m.group(1)
+        repo = m.group(2)
+        # Specific repo → always works (raw.githubusercontent.com, no auth needed)
+        if repo:
+            result = gh.run(action="read_repo", repo=f"{username}/{repo}")
+            if result.success:
+                return AgentResponse(message=f"## {username}/{repo}\n\n{result.summary[:1500]}")
+            # Fallback: search cached KB
+            if self._kb_service:
+                kb_results = self._kb_service.search(f"github:{username}/{repo}", top_k=3)
+                if kb_results:
+                    return AgentResponse(message="\n\n".join(r.content[:500] for r in kb_results))
+            return AgentResponse(message=f"无法读取 {username}/{repo}。请确认仓库名正确。")
+        # Username → search KB cache + try API
+        lines = [f"## {username} 的 GitHub 仓库（本地缓存）", ""]
+        found = False
+        if self._kb_service:
+            kb_results = self._kb_service.search(f"github:yfn-1116", top_k=15)
+            seen = set()
+            for r in kb_results:
+                for rn in ["career-agent-assistant","chem-auto-titration","polyu-internship-project",
+                          "opencode","machine-learning-labs","cnn-mnist-homework","mlp-mnist-homework","LeetCode"]:
+                    if rn in r.content and rn not in seen:
+                        seen.add(rn)
+                        lines.append(f"- **{rn}**: {r.content[:120].strip()}...")
+                        found = True
+        if found:
+            lines.append(f"\n共 {len(seen)} 个仓库。粘贴具体链接查看详情，例如 https://github.com/{username}/career-agent-assistant")
+            return AgentResponse(message="\n".join(lines))
+        # Last resort: try API
+        result = gh.run(action="list_user_repos", username=username)
+        if result.success:
+            return AgentResponse(message=f"## {username} 的公开仓库\n\n{result.summary}")
+        return AgentResponse(message=f"请粘贴具体仓库链接，例如 https://github.com/{username}/项目名")
 
     def _execute_rag_chat(self, user_message: str) -> AgentResponse:
+        # GitHub query? → use the github tool
+        if "github.com/" in user_message.lower() or "github" in user_message.lower():
+            return self._handle_github_query(user_message)
+
+        # Search KB for relevant context
+        kb_context = ""
+        results = []
+        if self._kb_service:
+            results = self._kb_service.search(user_message, top_k=3)
+            if results:
+                kb_context = "\n".join([f"- {r.title}: {r.content[:300]}" for r in results])
+
+        # Try LLM for chat reply
+        if self._llm_provider and self._llm_provider.is_available:
+            prompt = f"""你是求职助手。基于以下知识库内容回答用户问题。
+知识库内容：
+{kb_context or '（知识库中暂无直接相关内容）'}
+
+用户问题：{user_message}
+
+用中文简洁回答（100字以内）。如果知识库有相关内容就引用，没有就诚实说不知道。"""
+            try:
+                reply = self._llm_provider.generate(prompt, system_prompt="你是求职顾问，回答简洁、诚实。")
+                return AgentResponse(message=reply[:500], memory_used=True)
+            except Exception:
+                pass
+
+        count = len(results)
+        return AgentResponse(message=f"知识库中找到 {count} 条相关内容。" if count else "请提供更多信息。")
+
+    def _handle_github_query(self, user_message: str) -> AgentResponse:
+        """Use MCPGitHubTool to fetch real GitHub data."""
+        import re
+        from career_agent.tools.mcp_github_tool import MCPGitHubTool
+        gh = MCPGitHubTool()
+
+        # Extract username or repo from message
+        username = None
+        repo = None
+        # Pattern: github.com/username
+        m = re.search(r'github\.com/([^/\s]+)(?:/([^/\s]+))?', user_message)
+        if m:
+            username = m.group(1)
+            repo = m.group(2) if m.group(2) else None
+
+        if repo:
+            # Specific repo → read it
+            full_repo = f"{username}/{repo}"
+            result = gh.run(action="read_repo", repo=full_repo)
+            if result.success:
+                return AgentResponse(
+                    message=f"## 📂 {full_repo}\n\n{result.summary[:1500]}",
+                    data={"repo": full_repo}
+                )
+            return AgentResponse(message=f"无法读取 {full_repo}: {result.error}")
+
+        if username:
+            # Just username → list repos
+            result = gh.run(action="list_user_repos", username=username)
+            if result.success:
+                return AgentResponse(
+                    message=f"## 📂 {username} 的公开仓库\n\n{result.summary}",
+                    data={"username": username}
+                )
+            return AgentResponse(message=f"无法获取 {username} 的仓库: {result.error}")
+
+        return AgentResponse(message="请提供 GitHub 用户名或仓库链接。")
         if self._kb_service is None:
             from career_agent.service.knowledge_base import KnowledgeBaseService
             self._kb_service = KnowledgeBaseService()

@@ -1,0 +1,1690 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>期末实训展示 — Evidence-Constrained Agent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&family=Noto+Serif+SC:wght@600;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   DESIGN SYSTEM — Dark Tech Terminal
+   ============================================================ */
+:root {
+  --bg-deep: #0f1923;
+  --bg-panel: #152230;
+  --bg-card: #1a2a3a;
+  --bg-card-hover: #1f3042;
+  --border-subtle: #2a3d50;
+  --border-active: #3a5070;
+  --text-primary: #e0e8f0;
+  --text-secondary: #a0b4c8;
+  --text-muted: #7088a0;
+  --accent-cyan: #00d4f0;
+  --accent-cyan-dim: rgba(0, 212, 240, 0.18);
+  --accent-amber: #f0a838;
+  --accent-amber-dim: rgba(240, 168, 56, 0.18);
+  --accent-green: #3dd68c;
+  --accent-green-dim: rgba(61, 214, 140, 0.18);
+  --accent-rose: #f05060;
+  --accent-rose-dim: rgba(240, 80, 96, 0.18);
+  --accent-purple: #a78bfa;
+  --accent-purple-dim: rgba(167, 139, 250, 0.18);
+  --font-display: 'Noto Serif SC', 'Source Han Serif SC', 'STSong', 'SimSun', serif;
+  --font-body: 'Noto Sans SC', 'Source Han Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --shadow-card: 0 2px 12px rgba(0,0,0,0.3), 0 0 1px rgba(0,180,220,0.08);
+  --shadow-glow-cyan: 0 0 16px rgba(0,212,240,0.12), 0 0 2px rgba(0,212,240,0.08);
+  --shadow-glow-amber: 0 0 16px rgba(240,168,56,0.12);
+  --transition-fast: 150ms ease-out;
+  --transition-smooth: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Light theme — projector-safe */
+body.light {
+  --bg-deep: #f2f4f7;
+  --bg-panel: #ffffff;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f0f2f5;
+  --border-subtle: #d0d5dd;
+  --border-active: #90a4c4;
+  --text-primary: #1a1a2e;
+  --text-secondary: #4a5568;
+  --text-muted: #6b7a90;
+  --accent-cyan: #0078a0;
+  --accent-cyan-dim: rgba(0, 120, 160, 0.10);
+  --accent-amber: #b07010;
+  --accent-amber-dim: rgba(176, 112, 16, 0.10);
+  --accent-green: #1a8050;
+  --accent-green-dim: rgba(26, 128, 80, 0.10);
+  --accent-rose: #c02030;
+  --accent-rose-dim: rgba(192, 32, 48, 0.10);
+  --accent-purple: #6c50c0;
+  --accent-purple-dim: rgba(108, 80, 192, 0.10);
+  --shadow-card: 0 1px 4px rgba(0,0,0,0.08);
+  --shadow-glow-cyan: 0 0 0 1px rgba(0,120,160,0.2);
+  --shadow-glow-amber: 0 0 0 1px rgba(176,112,16,0.2);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 16px;
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+}
+
+/* Subtle background grid */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0,212,240,0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,212,240,0.02) 1px, transparent 1px);
+  background-size: 48px 48px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ============================================================
+   TOP BAR
+   ============================================================ */
+.topbar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 56px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  z-index: 100;
+  background: rgba(21, 34, 48, 0.97);
+}
+body.light .topbar { background: rgba(255,255,255,0.97); }
+
+.topbar-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--text-primary);
+}
+
+.topbar-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--accent-cyan);
+  box-shadow: 0 0 10px var(--accent-cyan);
+  animation: dot-pulse 2s ease-in-out infinite;
+}
+
+@keyframes dot-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.3); }
+}
+
+.topbar-subtitle {
+  font-size: 16px;
+  color: var(--text-secondary);
+  font-weight: 400;
+  margin-left: 4px;
+}
+
+.topbar-tabs {
+  display: flex;
+  gap: 2px;
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  padding: 3px;
+}
+
+.topbar-tab {
+  padding: 7px 18px;
+  border-radius: 7px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  color: var(--text-secondary);
+  border: none;
+  background: transparent;
+  font-family: var(--font-body);
+  white-space: nowrap;
+}
+
+.topbar-tab:hover {
+  color: var(--text-primary);
+  background: rgba(255,255,255,0.04);
+}
+
+.topbar-tab.active {
+  background: var(--accent-cyan-dim);
+  color: var(--accent-cyan);
+  box-shadow: 0 0 12px rgba(0,212,240,0.1);
+}
+
+/* ============================================================
+   MAIN CANVAS
+   ============================================================ */
+.main-stage {
+  position: fixed;
+  top: 56px; left: 0; right: 0; bottom: 52px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 32px;
+  z-index: 1;
+}
+
+.main-stage.panel-open {
+  right: 400px;
+}
+
+/* ============================================================
+   AGENT TREE VIEW
+   ============================================================ */
+.tree-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100%;
+  padding: 20px 40px 40px;
+  position: relative;
+}
+
+/* Section labels */
+.section-label {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+/* Root node — Orchestrator */
+.root-node {
+  background: var(--bg-card);
+  border: 1px solid var(--accent-cyan);
+  border-radius: var(--radius-lg);
+  padding: 20px 28px;
+  max-width: 520px;
+  width: 100%;
+  cursor: pointer;
+  transition: all var(--transition-smooth);
+  box-shadow: var(--shadow-glow-cyan);
+  position: relative;
+  z-index: 2;
+}
+
+.root-node:hover {
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 30px rgba(0,212,240,0.25), 0 0 4px rgba(0,212,240,0.2);
+  transform: translateY(-1px);
+}
+
+.node-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.node-icon {
+  width: 40px; height: 40px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.node-icon.root { background: var(--accent-cyan-dim); }
+.node-icon.perception { background: var(--accent-green-dim); }
+.node-icon.retrieve { background: var(--accent-amber-dim); }
+.node-icon.analysis { background: var(--accent-purple-dim); }
+.node-icon.generate { background: var(--accent-rose-dim); }
+.node-icon.verify { background: var(--accent-amber-dim); }
+
+.node-title-group { flex: 1; }
+.node-name { font-size: 18px; font-weight: 700; color: var(--text-primary); line-height: 1.3; }
+.node-eng { font-size: 13px; color: var(--text-secondary); font-family: var(--font-mono); }
+
+.node-meta {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  margin-top: 10px;
+}
+
+.node-tag {
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-weight: 500;
+}
+
+.node-tag.cyan { background: var(--accent-cyan-dim); color: var(--accent-cyan); }
+.node-tag.amber { background: var(--accent-amber-dim); color: var(--accent-amber); }
+.node-tag.green { background: var(--accent-green-dim); color: var(--accent-green); }
+.node-tag.rose { background: var(--accent-rose-dim); color: var(--accent-rose); }
+.node-tag.purple { background: var(--accent-purple-dim); color: var(--accent-purple); }
+
+.node-desc {
+  font-size: 15px;
+  color: var(--text-secondary);
+  margin-top: 8px;
+  line-height: 1.5;
+}
+
+.node-code-path {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+
+/* Connection lines area */
+.connections-area {
+  position: relative;
+  width: 100%;
+  max-width: 900px;
+  height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+
+.connector-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.connector-line {
+  stroke: var(--border-active);
+  stroke-width: 1.5;
+  fill: none;
+}
+
+.connector-line.parallel {
+  stroke: var(--accent-green);
+  stroke-dasharray: 6 3;
+  stroke-width: 1.5;
+}
+
+.connector-line.serial {
+  stroke: var(--accent-amber);
+  stroke-width: 1.5;
+}
+
+/* Execution mode badges on connections */
+.exec-badge {
+  position: absolute;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  padding: 3px 12px;
+  border-radius: 999px;
+  z-index: 3;
+  white-space: nowrap;
+}
+
+.exec-badge.parallel {
+  background: var(--accent-green-dim);
+  color: var(--accent-green);
+  border: 1px solid rgba(46,204,113,0.3);
+}
+
+.exec-badge.serial {
+  background: var(--accent-amber-dim);
+  color: var(--accent-amber);
+  border: 1px solid rgba(240,160,48,0.3);
+}
+
+/* SubAgent row */
+.subagents-row {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+  max-width: 1000px;
+  width: 100%;
+  position: relative;
+  z-index: 2;
+}
+
+.subagent-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  width: 210px;
+  cursor: pointer;
+  transition: all var(--transition-smooth);
+  position: relative;
+}
+
+.subagent-card:hover {
+  border-color: var(--border-active);
+  box-shadow: var(--shadow-card);
+  transform: translateY(-2px);
+}
+
+/* Accent tops for card type differentiation on projector */
+.subagent-card[data-agent="sub1"] { border-left: 3px solid var(--accent-green); }
+.subagent-card[data-agent="sub2"] { border-left: 3px solid var(--accent-amber); }
+.subagent-card[data-agent="sub3"] { border-left: 3px solid var(--accent-purple); }
+.subagent-card[data-agent="sub4"] { border-left: 3px solid var(--accent-rose); }
+
+.subagent-card.parallel-node {
+  animation: parallel-glow 3s ease-in-out infinite;
+}
+
+@keyframes parallel-glow {
+  0%, 100% { box-shadow: 0 0 0px rgba(46,204,113,0); }
+  50% { box-shadow: 0 0 16px rgba(46,204,113,0.2), 0 0 2px rgba(46,204,113,0.15); }
+}
+
+.subagent-card .permission-tags {
+  display: flex; flex-wrap: wrap; gap: 3px;
+  margin: 8px 0;
+}
+
+.subagent-card .perm-tag {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  background: rgba(255,255,255,0.06);
+  color: var(--text-primary);
+  border: 1px solid var(--border-active);
+}
+
+.subagent-io {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 6px;
+  line-height: 1.4;
+}
+
+.subagent-io span {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+/* Recursive sub-agent connector */
+.sub-recursive {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border-subtle);
+}
+
+/* Resource layer */
+.resource-layer {
+  display: flex;
+  gap: 20px;
+  margin-top: 32px;
+  max-width: 900px;
+  width: 100%;
+  z-index: 2;
+  position: relative;
+}
+
+.resource-card {
+  flex: 1;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 16px;
+}
+
+.resource-card h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.resource-card .steps {
+  display: flex; flex-direction: column; gap: 4px;
+}
+
+.resource-card .step {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  padding: 3px 8px;
+  border-radius: 3px;
+  background: rgba(255,255,255,0.02);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.resource-card .step .step-num {
+  color: var(--accent-cyan);
+  font-weight: 600;
+  min-width: 14px;
+}
+
+/* ============================================================
+   DETAIL PANEL (right side)
+   ============================================================ */
+.detail-panel {
+  position: fixed;
+  top: 56px; right: 0; bottom: 52px;
+  width: 400px;
+  background: var(--bg-panel);
+  border-left: 1px solid var(--border-subtle);
+  z-index: 100;
+  overflow-y: auto;
+  transform: translateX(100%);
+  transition: transform var(--transition-smooth);
+  padding: 0;
+}
+
+.detail-panel.open {
+  transform: translateX(0);
+}
+
+.detail-inner {
+  padding: 24px;
+}
+
+.detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.detail-close {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.detail-close:hover {
+  border-color: var(--accent-rose);
+  color: var(--accent-rose);
+}
+
+.detail-section {
+  margin-bottom: 20px;
+}
+
+.detail-section h4 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  font-family: var(--font-mono);
+}
+
+.detail-field {
+  background: var(--bg-card);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.detail-field.prompt { border-left: 2px solid var(--accent-cyan); }
+.detail-field.input { border-left: 2px solid var(--accent-green); }
+.detail-field.output { border-left: 2px solid var(--accent-amber); }
+.detail-field.path { border-left: 2px solid var(--accent-purple); font-size: 11px; }
+
+.detail-tools {
+  display: flex; flex-wrap: wrap; gap: 4px;
+}
+
+.detail-tool-tag {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+}
+
+/* ============================================================
+   DATA FLOW VIEW
+   ============================================================ */
+.flow-view { display: none; flex-direction: column; align-items: center; padding: 20px 40px; }
+.flow-view.active { display: flex; }
+
+.flow-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  max-width: 650px;
+  width: 100%;
+  padding: 16px 0;
+  position: relative;
+}
+
+.flow-step::before {
+  content: '';
+  position: absolute;
+  left: 19px; top: 48px; bottom: -16px;
+  width: 1px;
+  background: var(--border-active);
+  z-index: 0;
+}
+
+.flow-step:last-child::before { display: none; }
+
+.flow-num {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 700;
+  flex-shrink: 0;
+  z-index: 1;
+  position: relative;
+}
+
+.flow-num.in { background: var(--accent-cyan-dim); color: var(--accent-cyan); }
+.flow-num.perceive { background: var(--accent-green-dim); color: var(--accent-green); }
+.flow-num.plan { background: var(--accent-amber-dim); color: var(--accent-amber); }
+.flow-num.retrieve { background: var(--accent-purple-dim); color: var(--accent-purple); }
+.flow-num.generate { background: var(--accent-rose-dim); color: var(--accent-rose); }
+.flow-num.memory { background: var(--accent-amber-dim); color: var(--accent-amber); }
+.flow-num.output { background: var(--accent-cyan-dim); color: var(--accent-cyan); }
+
+.flow-content {
+  flex: 1;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  z-index: 1;
+  position: relative;
+}
+
+.flow-content h4 { font-size: 14px; margin-bottom: 4px; }
+.flow-content .flow-desc { font-size: 11px; color: var(--text-secondary); line-height: 1.5; }
+.flow-content .flow-path { font-size: 10px; font-family: var(--font-mono); color: var(--text-muted); margin-top: 4px; }
+
+/* ============================================================
+   RAG VIEW
+   ============================================================ */
+.rag-view { display: none; padding: 24px 40px; }
+.rag-view.active { display: flex; gap: 24px; }
+
+.rag-column {
+  flex: 1;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+}
+
+.rag-column h3 {
+  font-size: 14px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rag-step {
+  display: flex;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+  align-items: flex-start;
+}
+
+.rag-step:last-child { border-bottom: none; }
+
+.rag-step-num {
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  flex-shrink: 0;
+  background: var(--accent-cyan-dim);
+  color: var(--accent-cyan);
+}
+
+.rag-step-info { flex: 1; }
+.rag-step-info .rag-step-title { font-size: 12px; font-weight: 600; }
+.rag-step-info .rag-step-desc { font-size: 10px; color: var(--text-secondary); margin-top: 2px; font-family: var(--font-mono); }
+
+/* ============================================================
+   MEMORY VIEW
+   ============================================================ */
+.memory-view { display: none; padding: 24px 40px; }
+.memory-view.active { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; }
+
+.memory-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  width: 280px;
+  cursor: pointer;
+  transition: all var(--transition-smooth);
+}
+
+.memory-card:hover {
+  border-color: var(--border-active);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-card);
+}
+
+.memory-card .memory-icon {
+  font-size: 28px;
+  margin-bottom: 12px;
+}
+
+.memory-card h4 { font-size: 18px; margin-bottom: 6px; }
+.memory-card .memory-path { font-size: 12px; font-family: var(--font-mono); color: var(--text-muted); margin-bottom: 8px; }
+.memory-card .memory-detail { font-size: 14px; color: var(--text-secondary); line-height: 1.5; }
+
+/* ============================================================
+   BOTTOM STEP NAV
+   ============================================================ */
+.bottom-nav {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: 52px;
+  background: rgba(21, 34, 48, 0.97);
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  z-index: 100;
+}
+body.light .bottom-nav { background: rgba(255,255,255,0.97); }
+
+.nav-btn {
+  padding: 6px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nav-btn:hover {
+  border-color: var(--border-active);
+  color: var(--text-primary);
+}
+
+.nav-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.nav-indicator {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-secondary);
+  min-width: 120px;
+  text-align: center;
+}
+
+.nav-indicator .step-current {
+  color: var(--accent-cyan);
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.nav-steps {
+  display: flex;
+  gap: 4px;
+}
+
+.nav-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--border-active);
+  transition: all var(--transition-fast);
+}
+
+.nav-dot.active { background: var(--accent-cyan); width: 18px; border-radius: 999px; }
+.nav-dot.done { background: var(--accent-green); }
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width: 900px) {
+  .main-stage { right: 0; }
+  .subagents-row { flex-direction: column; align-items: center; }
+  .subagent-card { width: 100%; max-width: 320px; }
+  .resource-layer { flex-direction: column; }
+  .detail-panel { width: 100%; }
+  .topbar-tabs { gap: 0; }
+  .topbar-tab { padding: 7px 10px; font-size: 11px; }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-active); }
+
+/* Fade animations */
+.fade-in {
+  animation: fadeIn 0.5s ease-out both;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.delay-1 { animation-delay: 0.1s; }
+.delay-2 { animation-delay: 0.2s; }
+.delay-3 { animation-delay: 0.35s; }
+.delay-4 { animation-delay: 0.5s; }
+.delay-5 { animation-delay: 0.65s; }
+
+/* Node highlighting for step-by-step */
+.node-highlight {
+  box-shadow: 0 0 24px rgba(0,212,240,0.4), 0 0 4px rgba(0,212,240,0.3) !important;
+  border-color: var(--accent-cyan) !important;
+  z-index: 10 !important;
+  transform: scale(1.03) !important;
+}
+
+.memory-highlight {
+  box-shadow: 0 0 20px rgba(0,212,240,0.3), 0 0 3px rgba(0,212,240,0.2) !important;
+  border-color: var(--accent-cyan) !important;
+}
+
+/* Focus styles for keyboard navigation */
+.topbar-tab:focus-visible,
+.nav-btn:focus-visible,
+.detail-close:focus-visible {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: 2px;
+}
+.subagent-card:focus-visible,
+.root-node:focus-visible,
+.memory-card:focus-visible {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: 2px;
+  border-color: var(--accent-cyan);
+}
+
+/* Grid line opacity for projector */
+body::before { opacity: 0.6; }
+
+@media (prefers-reduced-motion: reduce) {
+  .fade-in { animation: none; opacity: 1; transform: none; }
+  .subagent-card.parallel-node { animation: none; }
+  .subagent-card:hover, .root-node:hover, .memory-card:hover { transform: none; }
+  .topbar-dot { animation: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     TOP BAR
+     ============================================================ -->
+<header class="topbar">
+  <div class="topbar-title">
+    <span class="topbar-dot"></span>
+    期末实训展示
+    <span class="topbar-subtitle">— Evidence-Constrained Agent 智能实习投递助手</span>
+  </div>
+  <nav class="topbar-tabs" id="tabNav">
+    <button class="topbar-tab active" data-view="tree" role="tab" aria-selected="true">Agent 递归树</button>
+    <button class="topbar-tab" data-view="flow" role="tab" aria-selected="false">数据流</button>
+    <button class="topbar-tab" data-view="rag" role="tab" aria-selected="false">RAG 详解</button>
+    <button class="topbar-tab" data-view="memory" role="tab" aria-selected="false">Memory 详解</button>
+  </nav>
+  <div style="display:flex;align-items:center;gap:10px;">
+    <button id="themeToggle" onclick="document.body.classList.toggle('light');this.textContent=document.body.classList.contains('light')?'🌙 暗色':'☀️ 亮色'" style="padding:5px 12px;border:1px solid var(--border-subtle);border-radius:6px;background:var(--bg-card);color:var(--text-secondary);cursor:pointer;font-size:12px;font-family:var(--font-body);white-space:nowrap;" aria-label="切换亮色/暗色主题">☀️ 亮色</button>
+  </div>
+</header>
+
+<!-- ============================================================
+     MAIN STAGE
+     ============================================================ -->
+<main class="main-stage" id="mainStage">
+
+  <!-- ============ AGENT TREE VIEW ============ -->
+  <div class="tree-container fade-in" id="treeView">
+    <div class="section-label">Agent 递归树 · 一条消息的完整旅程</div>
+
+    <!-- Root Node -->
+    <div class="root-node fade-in" data-agent="orchestrator" id="node-orchestrator">
+      <div class="node-header">
+        <div class="node-icon root">🧠</div>
+        <div class="node-title-group">
+          <div class="node-name">OrchestratorAgent · 主 Agent</div>
+          <div class="node-eng">agents/orchestrator.py:70</div>
+        </div>
+      </div>
+      <div class="node-meta">
+        <span class="node-tag cyan">16 Tools</span>
+        <span class="node-tag amber">LLM 决策循环</span>
+        <span class="node-tag green">max 10 步</span>
+        <span class="node-tag purple">System Prompt</span>
+      </div>
+      <div class="node-desc">
+        "你是实习求职助手，可用以下工具完成任务...所有输出必须基于证据，不得编造。"
+      </div>
+      <div class="node-desc" style="font-size:11px;margin-top:4px;color:var(--text-muted)">
+        LLM 每步自主决定：调用哪个 Tool？还是输出最终答案？
+      </div>
+    </div>
+
+    <!-- Connection labels -->
+    <div class="connections-area" style="height:60px;display:flex;align-items:flex-end;justify-content:center;gap:180px;padding-top:8px;">
+      <span class="exec-badge parallel">⚡ 并行执行</span>
+      <span class="exec-badge serial" style="margin-left:60px;">🔗 串行依赖</span>
+    </div>
+
+    <!-- SVG Connections -->
+    <svg class="connector-svg" style="position:absolute;top:120px;left:50%;transform:translateX(-50%);width:900px;height:180px;pointer-events:none;z-index:0;" viewBox="0 0 900 180">
+      <!-- Root to SubAgents -->
+      <line x1="450" y1="10" x2="160" y2="100" class="connector-line parallel"/>
+      <line x1="450" y1="10" x2="370" y2="100" class="connector-line parallel"/>
+      <line x1="450" y1="10" x2="580" y2="100" class="connector-line serial"/>
+      <line x1="450" y1="10" x2="790" y2="100" class="connector-line serial"/>
+      <!-- SubAgent-3 to SubAgent-3-1 -->
+      <line x1="580" y1="160" x2="580" y2="230" class="connector-line" style="stroke:var(--accent-purple);stroke-dasharray:4 2;"/>
+    </svg>
+
+    <!-- SubAgent Row -->
+    <div class="subagents-row fade-in delay-2" style="margin-top:16px;">
+      <!-- SubAgent-1: Perception -->
+      <div class="subagent-card parallel-node" data-agent="sub1" id="node-sub1" tabindex="0" role="button" aria-label="查看 SubAgent-1 详情">
+        <div class="node-header">
+          <div class="node-icon perception">📄</div>
+          <div class="node-title-group">
+            <div class="node-name" style="font-size:15px;">SubAgent-1</div>
+            <div class="node-eng" style="font-size:11px;">感知·解析专家</div>
+          </div>
+        </div>
+        <div class="permission-tags">
+          <span class="perm-tag">parse_jd</span>
+          <span class="perm-tag">web_search</span>
+        </div>
+        <div class="subagent-io">
+          <span>← Input:</span> JD文本 + PDF简历<br>
+          <span>→ Returns:</span> ParsedJD + 索引确认
+        </div>
+      </div>
+
+      <!-- SubAgent-2: Retrieve -->
+      <div class="subagent-card parallel-node" data-agent="sub2" id="node-sub2">
+        <div class="node-header">
+          <div class="node-icon retrieve">🔍</div>
+          <div class="node-title-group">
+            <div class="node-name" style="font-size:15px;">SubAgent-2</div>
+            <div class="node-eng" style="font-size:11px;">检索·知识专家</div>
+          </div>
+        </div>
+        <div class="permission-tags">
+          <span class="perm-tag">retrieve_profile</span>
+          <span class="perm-tag">github_repo</span>
+        </div>
+        <div class="subagent-io">
+          <span>← Input:</span> 岗位技能需求列表<br>
+          <span>→ Returns:</span> Evidence[3条] + GradeReport
+        </div>
+      </div>
+
+      <!-- SubAgent-3: Analysis -->
+      <div class="subagent-card" data-agent="sub3" id="node-sub3">
+        <div class="node-header">
+          <div class="node-icon analysis">⚖️</div>
+          <div class="node-title-group">
+            <div class="node-name" style="font-size:15px;">SubAgent-3</div>
+            <div class="node-eng" style="font-size:11px;">分析·匹配专家</div>
+          </div>
+        </div>
+        <div class="permission-tags">
+          <span class="perm-tag">analyze_match</span>
+          <span class="perm-tag">grade_retrieval</span>
+        </div>
+        <div class="subagent-io">
+          <span>← Input:</span> ParsedJD + Evidence[]<br>
+          <span>→ Returns:</span> MatchAnalysis
+        </div>
+        <!-- Recursive sub-agent -->
+        <div class="sub-recursive">
+          <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px;">↳ 递归生成</div>
+          <div class="subagent-card" style="width:auto;padding:10px;margin:0;border-color:var(--accent-purple);" data-agent="sub3-1" id="node-sub3-1">
+            <div class="node-header">
+              <div class="node-icon verify">✅</div>
+              <div class="node-title-group">
+                <div class="node-name" style="font-size:11px;">SubAgent-3-1</div>
+                <div class="node-eng" style="font-size:8px;">证据校验专员</div>
+              </div>
+            </div>
+            <div class="permission-tags">
+              <span class="perm-tag">check_faithfulness</span>
+            </div>
+            <div class="subagent-io">
+              <span>→ Returns:</span> can_write:2 · confirm:1 · blocked:0
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SubAgent-4: Generate -->
+      <div class="subagent-card" data-agent="sub4" id="node-sub4">
+        <div class="node-header">
+          <div class="node-icon generate">✏️</div>
+          <div class="node-title-group">
+            <div class="node-name" style="font-size:15px;">SubAgent-4</div>
+            <div class="node-eng" style="font-size:11px;">生成·输出专家</div>
+          </div>
+        </div>
+        <div class="permission-tags">
+          <span class="perm-tag">generate_answer</span>
+          <span class="perm-tag">write_report</span>
+        </div>
+        <div class="subagent-io">
+          <span>← Input:</span> MatchAnalysis + Evidence<br>
+          <span>→ Returns:</span> bullets + message + report
+        </div>
+      </div>
+    </div>
+
+    <!-- Resource Layer -->
+    <div class="resource-layer fade-in delay-4">
+      <div class="resource-card">
+        <h3>🔧 RAG Pipeline <span style="font-size:10px;color:var(--text-muted);font-weight:400;">rag/pipeline.py</span></h3>
+        <div class="steps">
+          <div class="step"><span class="step-num">写</span> SubAgent-1 → FileLoader → TextChunker → chunks.jsonl</div>
+          <div class="step"><span class="step-num">读</span> SubAgent-2 → BM25(80) + Embedding(80) → RRF(30) → CrossEncoder(5)</div>
+          <div class="step"><span class="step-num">校验</span> SubAgent-4 → FaithfulnessChecker → EvidenceGate</div>
+        </div>
+      </div>
+      <div class="resource-card">
+        <h3>🗄️ Memory 三层 <span style="font-size:10px;color:var(--text-muted);font-weight:400;">agents/memory.py</span></h3>
+        <div class="steps">
+          <div class="step"><span class="step-num">①</span> 短期：最近20条对话 · memory.py:54</div>
+          <div class="step"><span class="step-num">②</span> 长期：conversations.jsonl + BM25召回 · memory.py:86</div>
+          <div class="step"><span class="step-num">③</span> 知识库：chunks.jsonl · knowledge_base.py:48</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PPAM Legend -->
+    <div style="display:flex;gap:20px;margin-top:24px;justify-content:center;flex-wrap:wrap;" class="fade-in delay-5">
+      <span style="font-size:13px;color:var(--accent-green);font-family:var(--font-mono);">● Perception 感知</span>
+      <span style="font-size:10px;color:var(--accent-amber);font-family:var(--font-mono);">● Planning 规划</span>
+      <span style="font-size:10px;color:var(--accent-cyan);font-family:var(--font-mono);">● Action 执行</span>
+      <span style="font-size:10px;color:var(--accent-purple);font-family:var(--font-mono);">● Memory 记忆</span>
+    </div>
+  </div>
+
+  <!-- ============ DATA FLOW VIEW ============ -->
+  <div class="flow-view" id="flowView">
+    <div class="section-label" style="margin-bottom:12px;">数据流时间线 · 一条 JD 的完整旅程</div>
+    <div class="flow-step fade-in">
+      <div class="flow-num in">①</div>
+      <div class="flow-content">
+        <h4>用户输入</h4>
+        <div class="flow-desc">JD 文本 + PDF 简历 + GitHub URL → 统一进入系统</div>
+        <div class="flow-path">→ 主 Agent 接收消息，LLM 开始决策</div>
+      </div>
+    </div>
+    <div class="flow-step fade-in delay-1">
+      <div class="flow-num perceive">②</div>
+      <div class="flow-content">
+        <h4>感知：JDParser + FileLoader</h4>
+        <div class="flow-desc">JD 文本 → LLM 解析（回退规则匹配 26 项词库）→ ParsedJD<br>PDF → pypdf 提取 → TextChunker 分块 → 写入 chunks.jsonl</div>
+        <div class="flow-path">agents/jd_parser.py:65 · rag/loaders/file_loader.py:22</div>
+      </div>
+    </div>
+    <div class="flow-step fade-in delay-2">
+      <div class="flow-num plan">③</div>
+      <div class="flow-content">
+        <h4>规划：LLM 决策 + Agent 树分派</h4>
+        <div class="flow-desc">LLM 看到 16 个 Tool → 自主决定生成 3 个 SubAgent<br>SubAgent-1 (感知) ∥ SubAgent-2 (检索) → SubAgent-3 (分析) → SubAgent-4 (生成)</div>
+        <div class="flow-path">agents/autonomous_agent.py:56 · tools/registry.py:488</div>
+      </div>
+    </div>
+    <div class="flow-step fade-in delay-3">
+      <div class="flow-num retrieve">④</div>
+      <div class="flow-content">
+        <h4>检索：RAG 六步 Pipeline</h4>
+        <div class="flow-desc">jieba 分词 → BM25(80) + Qwen Embedding(80) → RRF 融合(k=60, top30) → CrossEncoder 精排(top5) → FaithfulnessChecker → EvidenceGate</div>
+        <div class="flow-path">rag/retrievers/hybrid_retriever.py · rag/reranker/cross_encoder_reranker.py</div>
+      </div>
+    </div>
+    <div class="flow-step fade-in delay-4">
+      <div class="flow-num generate">⑤</div>
+      <div class="flow-content">
+        <h4>生成 + 校验</h4>
+        <div class="flow-desc">MatchAnalysisAgent 比较 JD 需求 vs Evidence → BuildAgent 生成简历要点 → FaithfulnessChecker 校验 → EvidenceGate 分级输出</div>
+        <div class="flow-path">evidence/gate.py:46 · evaluation/faithfulness.py</div>
+      </div>
+    </div>
+    <div class="flow-step fade-in delay-5">
+      <div class="flow-num memory">⑥</div>
+      <div class="flow-content">
+        <h4>记忆写入</h4>
+        <div class="flow-desc">每轮对话 → 短期记忆(最近20条) + 长期记忆(JSONL) · 知识库更新 → chunks.jsonl</div>
+        <div class="flow-path">agents/memory.py:54,86</div>
+      </div>
+    </div>
+    <div class="flow-step fade-in">
+      <div class="flow-num output">⑦</div>
+      <div class="flow-content">
+        <h4>输出呈现</h4>
+        <div class="flow-desc">CLI · Streamlit · FastAPI · Browser Extension · Markdown 诊断报告 · JSON 诊断数据</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ RAG VIEW ============ -->
+  <div class="rag-view" id="ragView">
+    <div class="rag-column fade-in">
+      <h3>📥 写入路径 (Perception → Memory)</h3>
+      <div class="rag-step">
+        <div class="rag-step-num">1</div>
+        <div class="rag-step-info">
+          <div class="rag-step-title">FileLoader 多格式加载</div>
+          <div class="rag-step-desc">PDF → pypdf.PdfReader · DOCX → python-docx · MD/TXT → 直接读取<br>rag/loaders/file_loader.py:22</div>
+        </div>
+      </div>
+      <div class="rag-step">
+        <div class="rag-step-num">2</div>
+        <div class="rag-step-info">
+          <div class="rag-step-title">TextChunker 滑动窗口分块</div>
+          <div class="rag-step-desc">chunk_size=800 · overlap=100 · step=700<br>rag/chunking/text_chunker.py</div>
+        </div>
+      </div>
+      <div class="rag-step">
+        <div class="rag-step-num">3</div>
+        <div class="rag-step-info">
+          <div class="rag-step-title">写入知识库索引</div>
+          <div class="rag-step-desc">每 chunk 生成 SHA256 document_id · 追加到 chunks.jsonl<br>service/knowledge_base.py:64</div>
+        </div>
+      </div>
+    </div>
+    <div class="rag-column fade-in delay-2">
+      <h3>📤 读取路径 (Memory → Action)</h3>
+      <div class="rag-step">
+        <div class="rag-step-num">1</div>
+        <div class="rag-step-info">
+          <div class="rag-step-title">jieba 中文分词</div>
+          <div class="rag-step-desc">对查询文本进行中文分词，生成 token 集合</div>
+        </div>
+      </div>
+      <div class="rag-step">
+        <div class="rag-step-num">2</div>
+        <div class="rag-step-info">
+          <div class="rag-step-title">双路并行粗召回</div>
+          <div class="rag-step-desc">BM25 关键词检索 (top 80) + Qwen Embedding 语义检索 (1024维, top 80)</div>
+        </div>
+      </div>
+      <div class="rag-step">
+        <div class="rag-step-num">3</div>
+        <div class="rag-step-info">
+          <div class="rag-step-title">RRF 融合 (k=60, → top 30)</div>
+          <div class="rag-step-desc">零参数融合，不依赖分数校准<br>rag/retrievers/rrf_fusion.py</div>
+        </div>
+      </div>
+      <div class="rag-step">
+        <div class="rag-step-num">4</div>
+        <div class="rag-step-info">
+          <div class="rag-step-title">CrossEncoder 精排 (→ top 5)</div>
+          <div class="rag-step-desc">bge-reranker-base · 279M 参数 · 12层 Transformer<br>rag/reranker/cross_encoder_reranker.py</div>
+        </div>
+      </div>
+      <div class="rag-step">
+        <div class="rag-step-num">5</div>
+        <div class="rag-step-info">
+          <div class="rag-step-title">FaithfulnessChecker (阈值 0.75)</div>
+          <div class="rag-step-desc">检测夸大：bullet claim 是否超出 evidence 范围<br>evaluation/faithfulness.py</div>
+        </div>
+      </div>
+      <div class="rag-step">
+        <div class="rag-step-num">6</div>
+        <div class="rag-step-info">
+          <div class="rag-step-title">EvidenceGate 四级约束</div>
+          <div class="rag-step-desc">implemented→✅可写 · designed→⚠️需确认 · planned→❌禁止<br>evidence/gate.py:46</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ MEMORY VIEW ============ -->
+  <div class="memory-view" id="memoryView">
+    <div class="memory-card fade-in" data-agent="memory-short">
+      <div class="memory-icon">📝</div>
+      <h4>短期记忆</h4>
+      <div class="memory-path">agents/memory.py:54</div>
+      <div class="memory-detail">
+        保留最近 20 条对话<br>
+        内存列表存储，会话内有效<br>
+        格式化：<br>
+        [用户] 帮我分析Agent岗位<br>
+        [助手] 正在解析JD...<br>
+        每轮对话自动追加
+      </div>
+    </div>
+    <div class="memory-card fade-in delay-1" data-agent="memory-long">
+      <div class="memory-icon">💾</div>
+      <h4>长期记忆</h4>
+      <div class="memory-path">agents/memory.py:86</div>
+      <div class="memory-detail">
+        conversations.jsonl 持久化<br>
+        每消息一行 JSON<br>
+        recall("RAG 项目") → BM25 召回<br>
+        读取最近 200 行建索引<br>
+        跨会话可检索历史对话
+      </div>
+    </div>
+    <div class="memory-card fade-in delay-2" data-agent="memory-kb">
+      <div class="memory-icon">📚</div>
+      <h4>知识库</h4>
+      <div class="memory-path">service/knowledge_base.py:48</div>
+      <div class="memory-detail">
+        chunks.jsonl (用户画像索引)<br>
+        chunks.repos.txt (GitHub仓库)<br>
+        写入：FileLoader → TextChunker → 追加<br>
+        读取：BM25 + Qwen Embedding 混合检索<br>
+        支持懒重建索引 (dirty flag)
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- ============================================================
+     DETAIL PANEL
+     ============================================================ -->
+<aside class="detail-panel" id="detailPanel">
+  <div class="detail-inner">
+    <div class="detail-header">
+      <h3 id="detailTitle" style="font-size:16px;">Agent 详情</h3>
+      <button class="detail-close" onclick="closeDetail()">✕</button>
+    </div>
+    <div id="detailContent"></div>
+  </div>
+</aside>
+
+<!-- ============================================================
+     BOTTOM NAV
+     ============================================================ -->
+<nav class="bottom-nav">
+  <button class="nav-btn" id="btnPrev" onclick="prevStep()" disabled>◀ 上一步</button>
+  <div style="display:flex;flex-direction:column;align-items:center;">
+    <div class="nav-indicator">
+      <span class="step-current" id="stepLabel">Step 1/10</span>
+    </div>
+    <div class="nav-steps" id="navDots"></div>
+  </div>
+  <button class="nav-btn" id="btnNext" onclick="nextStep()">下一步 ▶</button>
+</nav>
+
+<script>
+// ============================================================
+// AGENT DATA — Real project paths and content
+// ============================================================
+const agentData = {
+  orchestrator: {
+    title: 'OrchestratorAgent · 主 Agent',
+    path: 'agents/orchestrator.py:70',
+    role: '实习求职助手总管',
+    systemPrompt: `"你是实习求职助手。你可以调用以下工具完成任务：
+
+- parse_jd: 解析岗位描述，提取技能和要求
+- retrieve_profile: 从知识库检索用户相关经历
+- analyze_match: 分析岗位匹配度
+- task_agent: 生成子Agent执行独立任务
+- web_search: 搜索网页补充信息
+- github_repo: 读取GitHub仓库
+- grade_retrieval: 评估检索质量
+- generate_grounded_answer: 基于证据生成回答
+- check_faithfulness: 验证输出真实性
+- write_report: 生成诊断报告
+- ...共16个工具
+
+规则：所有输出必须基于证据，不得编造。
+如果证据不足，诚实告知用户。
+每次工具调用返回后，判断下一步该做什么。"`,
+    tools: ['parse_jd', 'retrieve_profile', 'analyze_match', 'task_agent', 'web_search', 'github_repo', 'grade_retrieval', 'generate_grounded_answer', 'check_faithfulness', 'write_report', 'write_diagnostics', 'rerank_chunks', 'select_evidence', 'rewrite_query', 'plan_queries', 'fallback'],
+    input: '用户消息: "帮我分析这个Agent实习岗位" + JD文本 + resume.pdf',
+    output: '最终回复: 匹配度75% + 3条简历要点(2可写+1需确认) + HR沟通话术 + 诊断报告路径',
+    execution: 'LLM 决策循环 (max 10步):   Step1 → task_agent(解析)   Step2 → task_agent(检索)   Step3 → task_agent(分析+生成)   Step4 → 输出最终答案'
+  },
+  sub1: {
+    title: 'SubAgent-1 · 感知·解析专家',
+    path: 'agents/sub_agent.py:39 · agents/jd_parser.py:65',
+    role: '信息采集专家，解析所有输入并索引到知识库',
+    systemPrompt: `"你是信息采集专家。你的任务是：
+1. 解析JD文本，提取结构化信息
+2. 解析上传的PDF/DOCX简历文件
+3. 将解析结果索引到知识库
+
+可用工具：
+- parse_jd: LLM解析 + 规则回退(26项技能词库)
+- web_search: DuckDuckGo补充信息
+
+规则：LLM解析失败自动回退规则模式。"`,
+    tools: ['parse_jd', 'web_search'],
+    input: `task: "用户的resume.pdf和JD文本已提供，解析两者并索引到知识库"
+JD文本: "AI Agent开发实习生...Python, LangGraph, RAG, Docker..."
+resume.pdf: 陈小明的简历文件`,
+    output: `ParsedJD {
+  job_title: "AI Agent开发实习生",
+  job_direction: "agent",
+  hard_skills: [Python, LangGraph, RAG, Docker, ...],
+  bonus_skills: [FastAPI, Streamlit, MCP, ...],
+  soft_skills: [沟通能力, 团队协作]
+}
++
+"PDF已索引，共3个chunk写入chunks.jsonl"`,
+    execution: `① parse_jd(JD文本)
+   → LLM路径: System Prompt → Qwen → JSON解析
+   → 失败回退: 26项词库正则匹配
+② FileLoader(resume.pdf)
+   → pypdf.PdfReader提取所有页面文本
+③ TextChunker(chunk_size=800, overlap=100)
+   → 滑动窗口分块 → 3个DocumentChunk
+④ 写入 chunks.jsonl
+   → source: resume.pdf, chunk_id, content, chunk_index`
+  },
+  sub2: {
+    title: 'SubAgent-2 · 检索·知识专家',
+    path: 'agents/sub_agent.py:39 · rag/pipeline.py',
+    role: '知识检索专家，从知识库中检索与岗位相关的用户经历',
+    systemPrompt: `"你是知识检索专家。你的任务是：
+从知识库中检索与目标岗位最相关的用户经历证据。
+
+可用工具：
+- retrieve_profile: BM25 + Qwen Embedding 混合检索
+- github_repo: 从GitHub仓库读取项目信息
+
+规则：对检索结果进行质量评估。
+如果覆盖率不足，标注缺失技能。"`,
+    tools: ['retrieve_profile', 'github_repo', 'grade_retrieval'],
+    input: `task: "岗位需求: Agent开发, 硬技能: Python, LangGraph, RAG, Docker, FastAPI..."
+查询文本: "agent Python LangGraph RAG Docker FastAPI"`,
+    output: `RetrievedEvidence[3条]:
+① SmartApplyAgent (implemented, score:0.89)
+   匹配: Python, RAG, LangGraph, Streamlit
+② 智能滴定系统 (implemented, score:0.62)
+   匹配: Python, OpenCV
+③ PolyU导航 (designed, score:0.55)
+   匹配: FastAPI, PostgreSQL
+
+GradeReport:
+  evidence_count: 3, avg_score: 0.69
+  keyword_coverage: 5/8 (62.5%)
+  grade: "good", decision: continue`,
+    execution: `① jieba 分词查询文本
+② BM25 关键词检索 (top 80)
+   → rank_bm25.BM25Okapi
+③ Qwen Embedding 语义检索 (top 80)
+   → text-embedding-v3, 1024维, cosine相似度
+④ RRF 融合 (k=60, → top 30)
+   → 零参数，不依赖分数校准
+⑤ CrossEncoder 精排 (→ top 5)
+   → bge-reranker-base, 279M参数
+⑥ grade_retrieval 质量评估
+   → 5维度评分 → grade "good"
+⑦ 返回 top 3 Evidence`
+  },
+  'sub3': {
+    title: 'SubAgent-3 · 分析·匹配专家',
+    path: 'agents/sub_agent.py:39 · agents/match_analysis_agent.py',
+    role: '匹配分析专家，比较JD需求与用户证据',
+    systemPrompt: `"你是匹配分析专家。你的任务是：
+比较岗位要求与检索到的用户证据，分析匹配度。
+
+可用工具：
+- analyze_match: 逐技能比对JD vs Evidence
+- grade_retrieval: 评估检索是否充分
+
+规则：只基于提供的证据进行分析，不编造用户能力。"`,
+    tools: ['analyze_match', 'grade_retrieval'],
+    input: `task: "基于ParsedJD和RetrievedEvidence，分析匹配度"
+ParsedJD: {hard_skills: [Python, LangGraph, RAG, Docker, LLM, Agent, Tool Calling, 状态管理]}
+Evidence: [SmartApplyAgent(implemented), 智能滴定(implemented), PolyU导航(designed)]`,
+    output: `MatchAnalysis {
+  strengths: ["RAG项目直接匹配", "Agent开发理解深入", "Python经验丰富"],
+  weaknesses: ["Docker仅design阶段", "Tool Calling无直接经验"],
+  matched_skills: [Python, RAG, LangGraph, LLM, Agent, 状态管理],
+  missing_skills: [Docker, Tool Calling],
+  match_score: 0.75,
+  recommended: "strong_apply"
+}`,
+    execution: `① analyze_match(ParsedJD, Evidence[])
+   → 逐技能比对: implemented → matched
+                   designed → weak
+                   无证据 → missing
+② 可递归生成 SubAgent-3-1 校验每条简历要点
+   → task_agent(task="验证每条简历要点的证据来源")
+   → SubAgent-3-1: check_faithfulness
+③ 返回 MatchAnalysis`
+  },
+  'sub3-1': {
+    title: 'SubAgent-3-1 · 证据校验专员 (递归)',
+    path: 'agents/sub_agent.py:39 · evaluation/faithfulness.py',
+    role: '证据校验专员，验证每条生成内容是否有证据支撑',
+    systemPrompt: `"你是证据校验专员。你的任务是：
+对每条简历要点进行证据验证。
+
+可用工具：
+- check_faithfulness: 检测夸大、检测无证据声明
+
+规则：每条bullet必须至少有一条evidence支撑。
+超过evidence范围的声明标记为'unsupported'。"`,
+    tools: ['check_faithfulness'],
+    input: `task: "验证以下简历要点的证据来源"
+bullets: [
+  "独立开发RAG智能求职助手(已实现)",
+  "设计Docker容器化部署方案(仅设计)",
+  "规划MCP协议扩展支持(仅计划)"
+]
+evidence: SmartApplyAgent{status:implemented, claims:["RAG开发","Streamlit前端"]}`,
+    output: `FaithfulnessReport {
+  faithfulness_score: 0.85,
+  decision: "pass",
+  分类:
+  ✅ can_write: "独立开发RAG求职助手" (implemented证据)
+  ⚠️ needs_confirm: "设计Docker部署方案" (designed证据,需确认)
+  ❌ learning_plan: "规划MCP扩展" (planned证据,禁止写入简历)
+}`,
+    execution: `check_faithfulness(bullets, evidences):
+  ① 每条bullet提取技能词集合
+  ② 与evidence内容做重叠计算
+  ③ 检测夸大: "完整实现了" vs evidence仅"设计了"
+  ④ 公式: 0.3×evidence_score + 0.7×overlap_score
+  ⑤ 阈值0.75 → pass
+  ⑥ 返回分类: can_write / needs_confirmation / learning_plan`
+  },
+  sub4: {
+    title: 'SubAgent-4 · 生成·输出专家',
+    path: 'agents/sub_agent.py:39 · agents/build_agent.py:240',
+    role: '简历生成专家，基于证据生成简历要点和沟通话术',
+    systemPrompt: `"你是简历生成专家。你的任务是：
+基于匹配分析结果和证据，生成简历要点和HR沟通话术。
+
+可用工具：
+- generate_grounded_answer: 证据约束的生成
+- write_report: 输出Markdown诊断报告
+
+规则：必须基于证据，不得编造经历。
+implemented → 可写 · designed → 需确认 · planned → 禁止"`,
+    tools: ['generate_grounded_answer', 'write_report', 'check_faithfulness'],
+    input: `task: "基于MatchAnalysis和Evidence生成输出"
+MatchAnalysis: {matched:6/8, score:0.75, strengths:[RAG项目,Agent理解,Python]}
+Evidence: [SmartApplyAgent(implemented), 智能滴定(implemented), PolyU导航(designed)]`,
+    output: `GeneratedOutput {
+  resume_bullets: [
+    "✅ 独立开发RAG智能求职助手，集成LangGraph多Agent协作 (implemented)"
+    "⚠️ 设计Docker容器化部署方案 (designed, 需确认后写入)"
+    "📋 MCP协议扩展 → 建议补充实践经验 (planned, 暂不写入简历)"
+  ],
+  communication_message:
+    "您好，我有LangGraph和RAG项目经验，独立开发过Agent求职助手..."
+  summary: "匹配度75%，6/8技能覆盖，2项可写入简历"
+  report_path: outputs/demo/langgraph_result_xxx.md
+}`,
+    execution: `① generate_grounded_answer(MatchAnalysis, Evidence[])
+   → 每条evidence检查status
+   → implemented → can_write_claims (绿色)
+   → designed → needs_confirmation_claims (黄色)
+   → planned → learning_plan_claims (红色)
+② 生成 HR communication_message
+   → 基于matched_skills + strengths模板化
+③ write_report(state)
+   → 11段Markdown诊断报告
+④ write_diagnostics(state)
+   → JSON诊断数据`
+  },
+  'memory-short': {
+    title: '短期记忆 · Short-Term Memory',
+    path: 'agents/memory.py:54',
+    role: '会话内最近对话缓存',
+    systemPrompt: '保留最近 20 条对话，内存列表结构',
+    tools: ['remember()', 'get_context(n=10)', 'context_text()', 'clear_short_term()'],
+    input: '每轮对话自动调用 remember(role, content)',
+    output: '格式化文本: [用户] ... [助手] ... [系统] ...',
+    execution: 'ConversationMemory 类:  _short_term: list[MemoryEntry]  每轮对话自动追加  超出20条自动截断  context_text() 格式化给LLM'
+  },
+  'memory-long': {
+    title: '长期记忆 · Long-Term Memory',
+    path: 'agents/memory.py:86',
+    role: '跨会话对话持久化 + BM25 检索',
+    systemPrompt: 'conversations.jsonl 持久化存储',
+    tools: ['recall(query, top_k=3)'],
+    input: '每轮对话自动追加 JSON 行到文件',
+    output: 'BM25 检索返回最相关历史对话',
+    execution: 'recall(query, top_k=3):  ① 读取最近200行JSONL  ② 构建BM25Okapi索引  ③ 返回最相关条目  ④ fallback: BM25不可用时返回空列表'
+  },
+  'memory-kb': {
+    title: '知识库 · Knowledge Base',
+    path: 'service/knowledge_base.py:48',
+    role: '用户画像持久化索引',
+    systemPrompt: 'chunks.jsonl + chunks.repos.txt',
+    tools: ['index_text()', 'search(query)', 'ingest_github_repo()', 'get_summary()'],
+    input: '文件上传/GitHub读取 → TextChunker → 追加',
+    output: 'BM25 + Qwen Embedding 混合检索结果',
+    execution: 'KnowledgeBaseService:  _bm25_dirty flag 懒重建  search() → BM25 + MemoryVectorStore  回退: Keyword Overlap  token匹配率排序'
+  }
+};
+
+// ============================================================
+// STEP NAVIGATION
+// ============================================================
+const steps = [
+  { id: 'node-orchestrator', label: '用户输入 → System Prompt → LLM 决策循环' },
+  { id: 'node-sub1', label: 'SubAgent-1: 感知解析 (JD + PDF)' },
+  { id: 'node-sub2', label: 'SubAgent-2: RAG 检索 (混合检索)' },
+  { id: 'node-sub1', label: '⚡ SubAgent-1 ∥ SubAgent-2 并行执行' },
+  { id: 'node-sub3', label: 'SubAgent-3: 匹配分析 + 递归校验' },
+  { id: 'node-sub3-1', label: 'SubAgent-3-1: 证据校验 (递归子Agent)' },
+  { id: 'node-sub4', label: 'SubAgent-4: 证据约束生成输出' },
+  { id: null, label: 'Memory 三层写入 + 回复用户' },
+];
+let currentStep = 0;
+
+function renderDots() {
+  const container = document.getElementById('navDots');
+  container.innerHTML = steps.map((_, i) => {
+    let cls = '';
+    if (i === currentStep) cls = 'active';
+    else if (i < currentStep) cls = 'done';
+    return `<div class="nav-dot ${cls}" onclick="goToStep(${i})" style="cursor:pointer;"></div>`;
+  }).join('');
+}
+
+function updateNav() {
+  document.getElementById('stepLabel').textContent = `Step ${currentStep+1}/${steps.length}`;
+  document.getElementById('btnPrev').disabled = currentStep === 0;
+  document.getElementById('btnNext').disabled = currentStep === steps.length - 1;
+  renderDots();
+
+  // Highlight current node
+  document.querySelectorAll('.node-highlight,.memory-highlight').forEach(el => el.classList.remove('node-highlight','memory-highlight'));
+  const step = steps[currentStep];
+  if (step.id) {
+    const el = document.getElementById(step.id);
+    if (el) {
+      el.classList.add('node-highlight');
+      const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      el.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block: 'center' });
+    }
+  } else {
+    document.querySelectorAll('.resource-card, .memory-card').forEach(el => el.classList.add('memory-highlight'));
+  }
+}
+
+function nextStep() {
+  if (currentStep < steps.length - 1) { currentStep++; updateNav(); }
+}
+
+function prevStep() {
+  if (currentStep > 0) { currentStep--; updateNav(); }
+}
+
+function goToStep(i) { currentStep = i; updateNav(); }
+
+// ============================================================
+// DETAIL PANEL
+// ============================================================
+function openDetail(agentKey) {
+  const data = agentData[agentKey];
+  if (!data) return;
+
+  document.getElementById('detailTitle').textContent = data.title;
+  const content = document.getElementById('detailContent');
+  content.innerHTML = `
+    <div class="detail-section">
+      <h4>代码路径</h4>
+      <div class="detail-field path">${data.path}</div>
+    </div>
+    <div class="detail-section">
+      <h4>角色</h4>
+      <div class="detail-field" style="border-left-color:var(--accent-cyan);">${data.role}</div>
+    </div>
+    <div class="detail-section">
+      <h4>System Prompt</h4>
+      <div class="detail-field prompt">${data.systemPrompt}</div>
+    </div>
+    <div class="detail-section">
+      <h4>Allowed Tools (权限白名单)</h4>
+      <div class="detail-tools">
+        ${data.tools.map(t => `<span class="detail-tool-tag">${t}</span>`).join('')}
+      </div>
+    </div>
+    <div class="detail-section">
+      <h4>输入 (task 字符串)</h4>
+      <div class="detail-field input">${data.input}</div>
+    </div>
+    <div class="detail-section">
+      <h4>返回 (SubAgentResult)</h4>
+      <div class="detail-field output">${data.output}</div>
+    </div>
+    <div class="detail-section">
+      <h4>执行过程</h4>
+      <div class="detail-field" style="border-left-color:var(--accent-purple);">${data.execution || '见上方详细说明'}</div>
+    </div>
+  `;
+
+  document.getElementById('detailPanel').classList.add('open');
+  document.getElementById('mainStage').classList.add('panel-open');
+}
+
+function closeDetail() {
+  document.getElementById('detailPanel').classList.remove('open');
+  document.getElementById('mainStage').classList.remove('panel-open');
+}
+
+// ============================================================
+// VIEW SWITCHING
+// ============================================================
+function switchView(view) {
+  document.querySelectorAll('.topbar-tab').forEach(t => {
+    t.classList.remove('active');
+    t.setAttribute('aria-selected', 'false');
+  });
+  const activeTab = document.querySelector(`[data-view="${view}"]`);
+  activeTab.classList.add('active');
+  activeTab.setAttribute('aria-selected', 'true');
+
+  document.getElementById('treeView').style.display = view === 'tree' ? 'flex' : 'none';
+  document.getElementById('flowView').classList.toggle('active', view === 'flow');
+  document.getElementById('ragView').classList.toggle('active', view === 'rag');
+  document.getElementById('memoryView').classList.toggle('active', view === 'memory');
+}
+
+// ============================================================
+// EVENT BINDINGS
+// ============================================================
+document.querySelectorAll('.topbar-tab').forEach(tab => {
+  tab.addEventListener('click', () => switchView(tab.dataset.view));
+});
+
+// Agent node click handlers
+document.querySelectorAll('[data-agent]').forEach(node => {
+  node.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openDetail(node.dataset.agent);
+  });
+});
+
+// Close detail on clicking outside
+document.getElementById('mainStage').addEventListener('click', () => {
+  if (document.getElementById('detailPanel').classList.contains('open')) {
+    closeDetail();
+  }
+});
+
+// Keyboard navigation
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight') nextStep();
+  else if (e.key === 'ArrowLeft') prevStep();
+  else if (e.key === 'Escape') closeDetail();
+  else if (e.key === '1') switchView('tree');
+  else if (e.key === '2') switchView('flow');
+  else if (e.key === '3') switchView('rag');
+  else if (e.key === '4') switchView('memory');
+  else if (e.key === 'Home') { currentStep = 0; updateNav(); }
+  else if (e.key === 'End') { currentStep = steps.length - 1; updateNav(); }
+});
+
+// Initialize
+renderDots();
+updateNav();
+</script>
+</body>
+</html>

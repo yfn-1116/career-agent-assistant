@@ -37,7 +37,7 @@ from career_agent.rag.retrievers.hybrid_retriever import HybridRetriever
 from career_agent.rag.schemas import RetrievedEvidence
 from career_agent.rag.vectorstores.memory_store import MemoryVectorStore
 
-DEFAULT_MIN_RETRIEVAL_SCORE = 0.65
+DEFAULT_MIN_RETRIEVAL_SCORE = 0.35
 DEFAULT_MAX_RETRIES = 2
 
 
@@ -343,7 +343,7 @@ def check_faithfulness_node(state, *, ctx):
             evidences.append(Evidence(
                 evidence_id=ref, chunk_id=cv.chunk_id,
                 source=cv.source_path, content=cv.content,
-                confidence=getattr(cv, 'score', 0.5),
+                confidence=max(0.0, min(1.0, getattr(cv, 'score', 0.5) or 0.5)),
             ))
         else:
             evidences.append(Evidence(

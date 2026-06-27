@@ -65,7 +65,12 @@ class AutonomousAgent:
         self.max_steps = max_steps
 
     def run(self, user_message: str) -> AutonomousResult:
-        """Execute the autonomous agent loop.
+        """Execute the autonomous agent loop with full memory integration.
+
+        Memory layers used:
+        1. Short-term: last 10 conversation turns from ConversationMemory
+        2. Long-term: BM25 recall of relevant past conversations
+        3. Knowledge base: queried via retrieve_profile tool during loop
 
         Parameters
         ----------
@@ -78,29 +83,50 @@ class AutonomousAgent:
         """
         import time as _time
 
-        # Build tool descriptions for system prompt
+        # 1. Build tool descriptions for system prompt
         tool_desc = self._build_tool_prompt()
         system = (
-            "你是一个智能求职助手 Agent。你可以调用工具来完成用户的请求。\n\n"
+            "你是求职助手 Agent。直接高效地完成任务，不要过度解释。\n\n"
+            "工作流程（用户提供了 JD 和 GitHub）：\n"
+            "1. 同时调用 parse_jd 和 github(action='list_user_repos') — 并行，一步完成\n"
+            "2. 拿到仓库列表后，立即调用 github(action='read_repo', repo='owner/最相关的repo名') 读README\n"
+            "3. 调用 retrieve_profile 检索知识库中的匹配经历\n"
+            "4. 调用 analyze_match 做匹配分析\n"
+            "5. 输出最终结果\n\n"
             "规则：\n"
-            "1. 分析用户需求，自主决定需要调用哪些工具。\n"
-            "2. 如果用户提供了 JD 文本，先解析 JD，再检索经历，再做匹配分析。\n"
-            "3. 如果用户提供了 GitHub 链接，先拉取项目信息。\n"
-            "4. 所有生成内容必须基于检索到的 evidence，不得编造经历。\n"
-            "5. 如果不确定答案，诚实告知用户。\n"
-            "6. 用中文回复。\n\n"
-            f"可用工具列表：\n{tool_desc}\n\n"
-            "当你需要调用工具时，严格按以下 JSON 格式输出，不要加任何其他文字：\n"
-            '{"tool_call": {"name": "工具名", "input": {"参数名": "参数值"}}}\n\n'
-            "当你已经完成所有需要的工具调用，准备给用户最终答案时，直接输出你的回复。\n"
-            "不要输出 JSON，直接输出回答文本。"
+            "- 每步尽量同时调多个工具（一行一个 tool_call），减少轮次\n"
+            "- 不要猜测文件路径，read_repo 会自动读 README\n"
+            "- 用 github(action='list_user_repos', username='用户名') 列出仓库\n"
+            "- 用 github(action='read_repo', repo='owner/repo名') 读仓库\n"
+            "- 所有输出基于证据，不编造，用中文回复\n\n"
+            f"可用工具：\n{tool_desc}\n\n"
+            "调用工具时用: tool名(key='value', key2='value2')"
         )
 
+        # 2. Build message context with multi-layer memory
         messages: list[dict] = [
             {"role": "system", "content": system},
-            {"role": "user", "content": user_message},
         ]
 
+        # 2a. Short-term memory: recent conversation (last 10 turns)
+        short_term = self.memory.get_context(10)
+        if short_term:
+            messages.append({"role": "system", "content": "以下是最近的对话历史：\n" + "\n".join(
+                f"[{'用户' if e.role == 'user' else '助手'}]: {e.content[:300]}" for e in short_term
+            )})
+
+        # 2b. Long-term memory: recall relevant past conversations
+        recalled = self.memory.recall(user_message, top_k=2)
+        if recalled:
+            recall_text = "以下是历史相关对话（可能来自之前的会话）：\n" + "\n".join(
+                f"[{e.timestamp[:10]} {e.role}]: {e.content[:200]}" for e in recalled
+            )
+            messages.append({"role": "system", "content": recall_text})
+
+        # 2c. Current user message
+        messages.append({"role": "user", "content": user_message})
+
+        # 3. Agent loop
         steps: list[AgentStep] = []
         final_answer = ""
 
@@ -111,43 +137,52 @@ class AutonomousAgent:
             raw_response = self.llm.generate(prompt, system_prompt="")
             elapsed = (_time.perf_counter() - t0) * 1000
 
-            # Try to parse as tool_call
-            tool_call = self._parse_tool_call(raw_response)
+            # Try to parse tool_call(s) — LLM may output multiple in one response
+            tool_calls = self._parse_tool_calls(raw_response)
 
-            if tool_call is None:
+            if not tool_calls:
                 # No tool call → LLM is giving final answer
                 final_answer = raw_response.strip()
                 break
 
-            # Execute tool
-            tool_name = tool_call["name"]
-            tool_input = tool_call.get("input", {})
-            tool_result = self._execute_tool(tool_name, tool_input)
+            # Execute ALL tool calls from this response
+            all_results = []
+            for tc in tool_calls:
+                tool_name = tc["name"]
+                tool_input = tc.get("input", {})
+                tool_result = self._execute_tool(tool_name, tool_input)
 
-            step = AgentStep(
-                step=step_idx + 1,
-                tool_called=tool_name,
-                tool_input=json.dumps(tool_input, ensure_ascii=False),
-                tool_output=str(tool_result)[:300],
-                duration_ms=round(elapsed, 2),
-                success=bool(tool_result),
-            )
-            steps.append(step)
+                step = AgentStep(
+                    step=step_idx + 1,
+                    tool_called=tool_name,
+                    tool_input=json.dumps(tool_input, ensure_ascii=False),
+                    tool_output=str(tool_result)[:300],
+                    duration_ms=round(elapsed, 2),
+                    success=bool(tool_result),
+                )
+                steps.append(step)
+                all_results.append((tool_name, tool_result))
+                step_idx += 1  # count each tool call separately
 
-            # Append tool result to conversation
+                # Persist each tool result to memory
+                self.memory.remember("assistant", f"[调用工具: {tool_name}] {json.dumps(tool_input, ensure_ascii=False)[:200]}")
+                self.memory.remember("tool", str(tool_result)[:300])
+
+            # Append ALL results to conversation
             messages.append({"role": "assistant", "content": raw_response[:300]})
-            messages.append({"role": "tool", "content": str(tool_result)[:500]})
+            for tool_name, tool_result in all_results:
+                messages.append({"role": "tool", "content": f"[{tool_name}]: {str(tool_result)[:500]}"})
 
         else:
             # Loop exhausted (hit max_steps)
             final_answer = (
                 f"已完成 {len(steps)} 步工具调用。"
-                f"以下是当前状态：{json.dumps([s.tool_called for s in steps], ensure_ascii=False)}"
+                f"步骤: {', '.join(s.tool_called for s in steps)}。"
             )
 
-        # Store in memory
+        # 4. Persist final result
         self.memory.user_says(user_message)
-        self.memory.assistant_says(final_answer[:300])
+        self.memory.assistant_says(final_answer[:500])
 
         return AutonomousResult(
             answer=final_answer,
@@ -192,45 +227,119 @@ class AutonomousAgent:
     # -- tool call parsing ---------------------------------------------------
 
     @staticmethod
-    def _parse_tool_call(text: str) -> dict | None:
-        """Attempt to parse a tool_call JSON from LLM output.
+    def _extract_json_objects(text: str) -> list[dict]:
+        """Extract all JSON objects from text using brace matching."""
+        results = []
+        depth = 0
+        start = -1
+        for i, ch in enumerate(text):
+            if ch == '{':
+                if depth == 0:
+                    start = i
+                depth += 1
+            elif ch == '}':
+                depth -= 1
+                if depth == 0 and start >= 0:
+                    try:
+                        obj = json.loads(text[start:i+1])
+                        results.append(obj)
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+                    start = -1
+        return results
 
-        Returns None if the text is not a tool call.
-        """
-        text = text.strip()
+    @staticmethod
+    def _parse_python_style(text: str) -> list[dict]:
+        """Parse Python-style tool calls: tool_name(key='value', key2='value2')"""
+        import re
+        results = []
+        # Match: tool_name(param1='val1', param2='val2', ...)
+        for match in re.finditer(r'(\w+)\(([^)]+)\)', text):
+            name = match.group(1)
+            if name in ('http', 'https', 'print', 'def', 'class', 'if', 'for', 'while',
+                       'return', 'import', 'from', 'and', 'or', 'not', 'in', 'is'):
+                continue
+            args_str = match.group(2)
+            inputs = {}
+            # Match both single and double quoted values: key='val' or key=\"val\"
+            for pm in re.finditer(r"""(\w+)\s*=\s*['\"]([^'\"]*)['\"]""", args_str):
+                inputs[pm.group(1)] = pm.group(2)
+            if inputs:
+                results.append({"name": name, "input": inputs})
+        return results
 
-        # Try direct JSON parse
-        try:
-            data = json.loads(text)
-            if "tool_call" in data:
-                return data["tool_call"]
-        except (json.JSONDecodeError, TypeError):
-            pass
+    @staticmethod
+    def _normalize_tool_call(obj: dict) -> dict | None:
+        """Convert various tool call formats to {'name': ..., 'input': ...}."""
+        # Format 1: {"tool_call": {"name": ..., "input": ...}}
+        if "tool_call" in obj:
+            tc = obj["tool_call"]
+            if isinstance(tc, dict) and "name" in tc:
+                return {"name": tc["name"], "input": tc.get("input", tc.get("arguments", {}))}
+        # Format 2: {"tool": ..., "action": ..., "params": ...}
+        if "tool" in obj and "action" in obj:
+            return {"name": obj["tool"], "input": {"action": obj["action"], **obj.get("params", {}), **obj.get("input", {})}}
+        # Format 3: {"name": ..., "arguments": ...} or {"name": ..., "input": ...}
+        if "name" in obj:
+            return {"name": obj["name"], "input": obj.get("input", obj.get("arguments", {}))}
+        # Format 4: {"function": {"name": ..., "arguments": ...}}
+        if "function" in obj and isinstance(obj["function"], dict):
+            fc = obj["function"]
+            if "name" in fc:
+                return {"name": fc["name"], "input": fc.get("arguments", fc.get("input", {}))}
+        return None
 
-        # Try extracting JSON block from markdown code fences
-        if "```" in text:
-            import re
-            blocks = re.findall(r'```(?:json)?\s*(\{.*?\})\s*```', text, re.DOTALL)
-            for block in blocks:
+    @staticmethod
+    def _parse_tool_calls(text: str) -> list[dict]:
+        """Parse ALL tool calls from LLM output. Returns list of {'name':..., 'input':...}."""
+        import re
+        results = []
+        seen = set()
+
+        # Format A: [调用工具: tool_name] optionally followed by JSON or key=value
+        for m in re.finditer(r'\[调用工具[：:]\s*(\w+)\]\s*(\{.*?\})?', text):
+            tool_name = m.group(1)
+            inputs = {}
+            json_str = m.group(2)
+            if json_str:
                 try:
-                    data = json.loads(block)
-                    if "tool_call" in data:
-                        return data["tool_call"]
+                    obj = json.loads(json_str)
+                    inputs = obj.get("input", obj.get("params", obj))
+                    if "action" in obj or not inputs:
+                        inputs = dict(obj)
                 except (json.JSONDecodeError, TypeError):
                     pass
+            key = f"{tool_name}:{json.dumps(inputs, sort_keys=True)}"
+            if key not in seen:
+                seen.add(key)
+                results.append({"name": tool_name, "input": inputs})
 
-        # Try finding JSON object with tool_call key
-        import re
-        matches = re.findall(r'\{[^{}]*"tool_call"[^{}]*\}', text)
-        for match in matches:
-            try:
-                data = json.loads(match)
-                if "tool_call" in data:
-                    return data["tool_call"]
-            except (json.JSONDecodeError, TypeError):
-                pass
+        # Format B: JSON objects: {"tool": "X", "action": "Y", "params": {...}}
+        #           or {"tool_call": {"name": "X", "input": {...}}}
+        objects = AutonomousAgent._extract_json_objects(text)
+        for obj in objects:
+            normalized = AutonomousAgent._normalize_tool_call(obj)
+            if normalized:
+                key = f"{normalized['name']}:{json.dumps(normalized['input'], sort_keys=True)}"
+                if key not in seen:
+                    seen.add(key)
+                    results.append(normalized)
 
-        return None
+        # Format C: Python-style: tool_name(key='value', key2='value2')
+        python_calls = AutonomousAgent._parse_python_style(text)
+        for pc in python_calls:
+            key = f"{pc['name']}:{json.dumps(pc['input'], sort_keys=True)}"
+            if key not in seen:
+                seen.add(key)
+                results.append(pc)
+
+        return results
+
+    @staticmethod
+    def _parse_tool_call(text: str) -> dict | None:
+        """Parse a single tool call. Returns None if text is a final answer."""
+        calls = AutonomousAgent._parse_tool_calls(text)
+        return calls[0] if calls else None
 
     # -- tool execution ------------------------------------------------------
 

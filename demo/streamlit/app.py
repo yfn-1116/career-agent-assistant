@@ -48,7 +48,7 @@ _MATCH_TOKENS = ["适合我吗", "匹配", "适不适合", "能不能投", "帮�
 _GITHUB_URL = "github.com"
 
 
-@st.cache_resource
+@st.cache_resource(ttl=600)  # re-init every 10min to pick up config changes
 def _services() -> tuple[KnowledgeBaseService, ApplicationService, AgentRunService, OrchestratorAgent]:
     kb = KnowledgeBaseService()
     app = ApplicationService()
@@ -59,7 +59,8 @@ def _services() -> tuple[KnowledgeBaseService, ApplicationService, AgentRunServi
     llm = None
     try:
         from career_agent.infrastructure.llm import create_llm_provider
-        llm = create_llm_provider()
+        from career_agent.core.settings import Settings as _Settings
+        llm = create_llm_provider(provider=_Settings().llm.provider)
     except Exception:
         pass
 
@@ -87,7 +88,12 @@ def _llm(prompt: str, system: str = "你是专业的求职顾问助手") -> str 
 
 def _route_intent(text: str) -> str:
     t = text.lower()
-    if _GITHUB_URL in t:
+    # JD + GitHub combo → analyze_job (not github_ingest)
+    has_github = _GITHUB_URL in t
+    has_jd = len(text) > 200 and any(kw in text for kw in _JD_TOKENS)
+    if has_jd and any(kw in text for kw in _JD_TOKENS):
+        return "analyze_job"
+    if has_github and not has_jd:
         return "github_ingest"
     if any(kw in text for kw in _RESUME_TOKENS):
         return "tailor_resume"
