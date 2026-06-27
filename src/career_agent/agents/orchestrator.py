@@ -101,9 +101,14 @@ class OrchestratorAgent:
         keywords = [kw for kw in ["Python","RAG","Agent","LangGraph","FastAPI","简历","JD","匹配","GitHub","面试"]
                     if kw.lower() in t]
 
-        if len(text) > 200 and any(kw in text for kw in [
-            "岗位要求", "岗位职责", "任职要求", "职位描述", "薪资", "招聘",
-        ]):
+        has_github = "github.com" in t
+        has_jd = len(text) > 100 and any(kw in text for kw in [
+            "岗位要求", "岗位职责", "任职要求", "职位描述", "薪资", "招聘", "岗位", "实习", "JD",
+        ])
+        # JD + GitHub combo → analyze_job (not github_ingest)
+        if has_jd and has_github:
+            return ("analyze_job", keywords)
+        if has_jd:
             return ("analyze_job", keywords)
         if any(kw in text for kw in ["简历", "bullet", "项目描述"]):
             return ("tailor_resume", keywords)
@@ -111,7 +116,7 @@ class OrchestratorAgent:
             return ("generate_message", keywords)
         if any(kw in t for kw in ["知道我", "我的资料", "知识库", "了解我", "个人画像"]):
             return ("show_profile", keywords)
-        if "github.com" in t:
+        if has_github:
             return ("github_ingest", keywords)
         if len(text) > 100 and any(kw in text for kw in ["岗位", "实习", "JD"]):
             return ("analyze_job", keywords)
@@ -193,7 +198,7 @@ class OrchestratorAgent:
         import re
         from career_agent.tools.mcp_github_tool import MCPGitHubTool
         gh = MCPGitHubTool()
-        m = re.search(r"github\.com/([^/\s]+)(?:/([^/\s]+))?", text)
+        m = re.search(r"github\.com/([a-zA-Z0-9._-]+)(?:/([a-zA-Z0-9._-]+))?", text)
         if not m:
             return AgentResponse(message="请提供 GitHub 链接")
         username = m.group(1)
